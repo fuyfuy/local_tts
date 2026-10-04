@@ -36,7 +36,7 @@ The LLM's *only* job is Stage 2. Everything else is plumbing.
 
 ```
 tts_local_workflow/
-├── skills/document-to-audio/SKILL.md   # this file (the agent skill)
+├── .claude/skills/document-to-audio/SKILL.md   # this file (the agent skill)
 ├── PREP.md                       # spec for the Stage-1 (prepare) model
 ├── cleanup_prompt.txt            # DEFAULT editing prompt (shared fallback)
 ├── requirements.txt
