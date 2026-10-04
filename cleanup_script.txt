@@ -1,0 +1,206 @@
+### Runner                                                                                                                                                                                   
+                                                                                                                                                                                              
+ Simplest path is Ollama (auto-manages CUDA), then a thin Python client:                                                                                                                      
+                                                                                                                                                                                              
+ ```bash                                                                                                                                                                                      
+   curl -fsSL https://ollama.com/install.sh | sh                                                                                                                                              
+   ollama pull qwen3:8b                                                                                                                                                                       
+ ```                                                                                                                                                                                          
+                                                                                                                                                                                              
+ (Alternative: transformers + bitsandbytes with load_in_4bit=True keeps it all in your venv — same models, more setup. Ollama is the least friction.)                                         
+                                                                                                                                                                                              
+ ────────────────────────────────────────────────────────────────────────────────                                                                                                             
+                                                                                                                                                                                              
+ 2. The prompt                                                                                                                                                                                
+                                                                                                                                                                                              
+ The centerpiece. The prompt has to do everything the transcript listed: strip headers/page numbers/citation markers, verbalize headings, code, tables, math — while never touching the       
+ actual technical content.                                                                                                                                                                    
+                                                                                                                                                                                              
+ ```python                                                                                                                                                                                    
+   SYSTEM = """You are a copy editor converting raw Markdown extracted from a                                                                                                                 
+   technical book into a clean script for text-to-speech narration.                                                                                                                           
+                                                                                                                                                                                              
+   FAITHFULNESS (highest priority): Do not add, invent, or omit technical                                                                                                                     
+   content. Every claim, number, and term in the source must survive, except                                                                                                                  
+   for the noise listed below. You may reorder clauses slightly for spoken                                                                                                                    
+   flow, but never change meaning.                                                                                                                                                            
+                                                                                                                                                                                              
+   REMOVE — these never belong in audio:                                                                                                                                                      
+   - Running headers and footers (repeated book/section titles, standalone page numbers)                                                                                                      
+   - Footnote and citation markers (superscript digits, "[1]", "(2024)")                                                                                                                      
+   - Hyphenation artifacts ("infer-\nence" -> "inference")                                                                                                                                    
+   - All Markdown syntax (#, **, backticks, | table cells, [link](url))                                                                                                                       
+                                                                                                                                                                                              
+   VERBALIZE:                                                                                                                                                                                 
+   - Headings: "## 5.1 Quantization" -> "Now: section five point one, Quantization."                                                                                                          
+     Always speak section numbers out ("five point one point one").                                                                                                                           
+   - Code blocks: read the code line by line, with additional comments on what's going in each line. Try your best to make the code snippet understandable to a reader. Explain things like which language the code is written in and which libraries/frameworks are used, if any.
+   
+   - Tables: don't read cell by cell. Summarize the takeaway in a few sentences.                                                                                                         
+   - Equations: render in words ("x squared plus y") or paraphrase the concept.                                                                                                               
+   - Figure captions: keep only if informative, as "The figure shows ...";                                                                                                                    
+     drop bare "Figure 3:" prefixes.                                                                                                                                                          
+                                                                                                                                                                                              
+   PRONUNCIATION HINTS (spell out what a TTS engine may misread):                                                                                                                             
+   - "e.g." -> "for example", "i.e." -> "that is", "etc." -> "and so on"                                                                                                                      
+   - "Fig. 3" -> "figure three", "x" (multiply) -> "times", "->" -> "leads to"                                                                                                                
+   - Keep well-known acronyms as-is (GPU, CPU, RAM); spell out ambiguous ones.                                                                                                                
+                                                                                                                                                                                              
+   FORMAT:                                                                                                                                                                                    
+   - Output plain text only. No Markdown, no code fences, no bullet symbols.                                                                                                                  
+   - Normal prose paragraphs separated by a blank line.                                                                                                                                       
+   - Every sentence ends with terminal punctuation (. ! ?).                                                                                                                                   
+   - No meta-commentary, no "Here is the cleaned text". Return only the narration.                                                                                                            
+   """                                                                                                                                                                                        
+ ```                                                                                                                                                                                          
+                                                                                                                                                                                              
+ Settings that matter:                                                                                                                                                                        
+ - temperature 0.1–0.2 — low temperature keeps it faithful; this is a determinism job, not a creativity job.                                                                                  
+ - num_ctx 8192 — enough for a full section; more context = more VRAM.                                                                                                                        
+                                                                                                                                                                                              
+ ### Chunking                                                                                                                                                                                 
+                                                                                                                                                                                              
+ Don't feed a whole chapter at once. Split on ## headings and clean each section independently, then stitch in order — this keeps you within context and avoids the model silently truncating 
+ a long chapter.                                                                                                                                                                              
+                                                                                                                                                                                              
+ ```python                                                                                                                                                                                    
+   import re, requests                                                                                                                                                                        
+   from pathlib import Path                                                                                                                                                                   
+                                                                                                                                                                                              
+   MODEL = "qwen3:8b"                                                                                                                                                                         
+   URL   = "http://localhost:11434/api/generate"                                                                                                                                              
+   IN    = Path("out")                                                                                                                                                                        
+   OUT   = Path("clean")                                                                                                                                                                      
+   OUT.mkdir(exist_ok=True)                                                                                                                                                                   
+                                                                                                                                                                                              
+   def clean_chunk(text: str) -> str:                                                                                                                                                         
+       r = requests.post(URL, json={                                                                                                                                                          
+           "model": MODEL,                                                                                                                                                                    
+           "system": SYSTEM,                                                                                                                                                                  
+           "prompt": text,                                                                                                                                                                    
+           "stream": False,                                                                                                                                                                   
+           "options": {"temperature": 0.2, "num_ctx": 8192},                                                                                                                                  
+       })                                                                                                                                                                                     
+       r.raise_for_status()                                                                                                                                                                   
+       return r.json()["response"].strip()                                                                                                                                                    
+                                                                                                                                                                                              
+   def split_chapter(md: str) -> list[str]:                                                                                                                                                   
+       # split at each "## " heading, keeping the heading with its body                                                                                                                       
+       return [p.strip() for p in re.split(r"(?m)^(?=## )", md) if p.strip()]                                                                                                                 
+                                                                                                                                                                                              
+   for src in sorted(IN.glob("*.md")):                                                                                                                                                        
+       cleaned = [clean_chunk(sec) for sec in split_chapter(src.read_text())]                                                                                                                 
+       (OUT / (src.stem + ".txt")).write_text("\n\n".join(cleaned))                                                                                                                           
+       print(f"cleaned {src.name}")                                                                                                                                                           
+ ```                                                                                                                                                                                          
+                                                                                                                                                                                              
+ Run it and it produces clean/00_preface.txt, clean/01_chapter-0-inference.txt, etc.                                                                                                          
+                                                                                                                                                                                              
+ ────────────────────────────────────────────────────────────────────────────────                                                                                                             
+                                                                                                                                                                                              
+ 3. Evals on the final text                                                                                                                                                                   
+                                                                                                                                                                                              
+ Two layers: cheap automated checks (catch the objective failures) and a human listen test (the real verdict).                                                                                
+                                                                                                                                                                                              
+ ### Automated checks — eval.py                                                                                                                                                               
+                                                                                                                                                                                              
+ ```python                                                                                                                                                                                    
+   import re                                                                                                                                                                                  
+   from collections import Counter                                                                                                                                                            
+   from pathlib import Path                                                                                                                                                                   
+                                                                                                                                                                                              
+   CLEAN = Path("clean")                                                                                                                                                                      
+   IN    = Path("out")                                                                                                                                                                        
+                                                                                                                                                                                              
+   def markdown_residue(t):                                                                                                                                                                   
+       pats = [r"#", r"\*\*", r"`", r"^\s*\|", r"\]\(", r"http"]                                                                                                                              
+       return {p: len(re.findall(p, t, re.M)) for p in pats}                                                                                                                                  
+                                                                                                                                                                                              
+   def orphan_numbers(t):                                                                                                                                                                     
+       return [ln for ln in t.splitlines()                                                                                                                                                    
+               if re.fullmatch(r"\s*\d{1,4}\s*", ln)]  # standalone page numbers                                                                                                              
+                                                                                                                                                                                              
+   def dangling_lines(t):                                                                                                                                                                     
+       # non-empty lines that don't end in terminal punctuation                                                                                                                               
+       return [ln.strip() for ln in t.splitlines()                                                                                                                                            
+               if ln.strip() and not ln.strip().endswith((".", "?", "!"))]                                                                                                                    
+                                                                                                                                                                                              
+   def repeated_lines(t, thr=3):                                                                                                                                                              
+       lines = [ln.strip() for ln in t.splitlines() if len(ln.strip()) > 15]                                                                                                                  
+       return [(l, c) for l, c in Counter(lines).items() if c >= thr]  # headers                                                                                                              
+                                                                                                                                                                                              
+   for f in sorted(CLEAN.glob("*.txt")):                                                                                                                                                      
+       t = f.read_text()                                                                                                                                                                      
+       src = (IN / (f.stem + ".md")).read_text()                                                                                                                                              
+       ratio = len(t) / max(len(src), 1)                                                                                                                                                      
+       report = {                                                                                                                                                                             
+           "md_residue": markdown_residue(t),                                                                                                                                                 
+           "orphan_numbers": len(orphan_numbers(t)),                                                                                                                                          
+           "dangling_lines": len(dangling_lines(t)),                                                                                                                                          
+           "repeated_lines": len(repeated_lines(t)),                                                                                                                                          
+           "length_ratio": round(ratio, 2),                                                                                                                                                   
+       }                                                                                                                                                                                      
+       print(f"\n=== {f.name} ===")                                                                                                                                                           
+       for k, v in report.items():                                                                                                                                                            
+           flag = "" if _ok(k, v) else "  <-- CHECK"                                                                                                                                          
+           print(f"  {k}: {v}{flag}")                                                                                                                                                         
+ ```                                                                                                                                                                                          
+                                                                                                                                                                                              
+ with a tiny _ok() gate, e.g.:                                                                                                                                                                
+                                                                                                                                                                                              
+ ```python                                                                                                                                                                                    
+   def _ok(k, v):                                                                                                                                                                             
+       limits = {                                                                                                                                                                             
+           "md_residue": lambda d: sum(d.values()) == 0,                                                                                                                                      
+           "orphan_numbers": lambda n: n == 0,                                                                                                                                                
+           "dangling_lines": lambda n: n == 0,                                                                                                                                                
+           "repeated_lines": lambda n: n == 0,                                                                                                                                                
+           "length_ratio": lambda r: 0.5 <= r <= 1.3,                                                                                                                                         
+       }                                                                                                                                                                                      
+       return limits[k](v)                                                                                                                                                                    
+ ```                                                                                                                                                                                          
+                                                                                                                                                                                              
+ What each check catches:                                                                                                                                                                     
+                                                                                                                                                                                              
+ - md_residue — the model left Markdown in ("#", bold, code fences, table pipes, URLs). Should be zero.                                                                                       
+ - orphan_numbers — a page number survived as a bare line. Should be zero.                                                                                                                    
+ - dangling_lines — sentences cut off / headings not punctuated. Near zero (blank lines and a few section transitions are fine).                                                              
+ - repeated_lines — a running header ("Inference Engineering") still repeating. Should be zero.                                                                                               
+ - length_ratio — the big one. If a cleaned chapter is < 50% of the source, the model **dropped content**; if > 130%, it's hallucinating or being verbose. Typical healthy range for this     
+ task is 0.7–1.0.                                                                                                                                                                             
+                                                                                                                                                                                              
+ ### The human listen test (the one that actually matters)                                                                                                                                    
+                                                                                                                                                                                              
+ Automated checks prove the format is clean; they don't prove it sounds right. Take 3 sections — one prose-heavy, one with a code listing, one with a table/equation — and either read them   
+ aloud or push them through Kokoro. Score each 1–5 on:                                                                                                                                        
+                                                                                                                                                                                              
+ 1. Faithfulness — nothing technical added or lost                                                                                                                                            
+ 2. Fluency — reads as natural spoken English, no stumbles                                                                                                                                    
+ 3. No cruft — no stray numbers/headers/braces audible                                                                                                                                        
+ 4. TTS-readiness — acronyms, numbers, and symbols spoken correctly                                                                                                                           
+                                                                                                                                                                                              
+ Anything scoring < 4 tells you what to fix in the prompt (usually a pronunciation rule or a code/table instruction).                                                                         
+                                                                                                                                                                                              
+ ### Optional: LLM-as-judge                                                                                                                                                                   
+                                                                                                                                                                                              
+ For more coverage without reading everything yourself, use the same model with a scoring prompt over a random sample of sections:                                                            
+                                                                                                                                                                                              
+ ```python                                                                                                                                                                                    
+   JUDGE = """Score the cleaned narration against the source Markdown.                                                                                                                        
+   1. Faithfulness (1-5): no technical content added or dropped                                                                                                                               
+   2. Fluency (1-5): natural spoken English                                                                                                                                                   
+   3. No-cruft (1-5): headers, page numbers, markdown syntax fully removed                                                                                                                    
+   Reply with three numbers and one line of justification for the lowest score."""                                                                                                            
+ ```                                                                                                                                                                                          
+                                                                                                                                                                                              
+ This is heavier compute, so sample ~10% of sections, not everything.                                                                                                                         
+                                                                                                                                                                                              
+ ────────────────────────────────────────────────────────────────────────────────                                                                                                             
+                                                                                                                                                                                              
+ 4. The "best model" bake-off                                                                                                                                                                 
+                                                                                                                                                                                              
+ To actually pick a model rather than trust my table: grab the same 3 representative sections, run them through qwen3:8b and llama3.1:8b (and qwen2.5:14b if you're patient) with the         
+ identical prompt, then run eval.py and the listen test on both. The one with fewer flags and better listen scores wins. It's ~15 minutes of your time and settles it on your text, which is  
+ the only benchmark that matters here.                                                                                                                                                        
+                                                                                                                                                                                              
+ Want me to draft the Kokoro TTS stage next, so the pipeline runs end-to-end?            

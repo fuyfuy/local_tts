@@ -1,0 +1,13 @@
+# Core (stage 0 extraction + stage 2 cleaning)
+requests>=2.31
+pymupdf
+pymupdf4llm
+
+# Stage 3 (TTS)
+kokoro>=0.9.4
+soundfile
+
+# Optional — only needed for legacy/clean_torch.py (PyTorch experiment)
+# torch
+# transformers
+# bitsandbytes

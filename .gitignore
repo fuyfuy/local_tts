@@ -1,0 +1,14 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Generated data (regenerable by running the scripts). Book raw/clean is also
+# derived from a copyrighted PDF, so it is deliberately not committed.
+corpus/*/raw/
+corpus/*/clean/
+corpus/*/audio/
+
+# Source documents (large + third-party copyright)
+*.pdf
