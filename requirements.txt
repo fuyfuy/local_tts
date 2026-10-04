@@ -7,6 +7,9 @@ pymupdf4llm
 kokoro>=0.9.4
 soundfile
 
+# Stage 3.5 (compression) — static ffmpeg, used when system ffmpeg is absent
+imageio-ffmpeg
+
 # Optional — only needed for legacy/clean_torch.py (PyTorch experiment)
 # torch
 # transformers

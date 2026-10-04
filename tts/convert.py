@@ -1,7 +1,7 @@
 """Compress WAV audio to a smaller format with ffmpeg.
 
 Our source is mono 24 kHz speech; a lossy codec shrinks it ~10x with no
-audible loss. Requires ffmpeg on PATH (`sudo apt install ffmpeg`).
+audible loss. Uses ffmpeg — from PATH, or the pip-installed static build.
 
 Usage:
     python tts/convert.py corpus/inference-engineering/audio            # all *.wav in dir
@@ -9,6 +9,7 @@ Usage:
 """
 
 import argparse
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -22,10 +23,25 @@ FORMATS = {
 DEFAULT_BITRATE = {"mp3": "64k", "opus": "48k", "ogg": "64k", "m4a": "64k"}
 
 
+def _ffmpeg() -> str:
+    """Locate ffmpeg: system binary, else the pip-installed static one."""
+    exe = shutil.which("ffmpeg")
+    if exe:
+        return exe
+    try:
+        import imageio_ffmpeg
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except ImportError:
+        raise SystemExit(
+            "ffmpeg not found — run 'sudo apt install ffmpeg' or "
+            "'pip install imageio-ffmpeg'."
+        )
+
+
 def convert(src: Path, fmt: str, bitrate: str) -> Path:
     codec = FORMATS[fmt]["codec"]
     dst = src.with_suffix(FORMATS[fmt]["ext"])
-    cmd = ["ffmpeg", "-y", "-loglevel", "error",
+    cmd = [_ffmpeg(), "-y", "-loglevel", "error",
            "-i", str(src), "-c:a", codec, "-b:a", bitrate, "-ac", "1", str(dst)]
     subprocess.run(cmd, check=True)
     return dst
