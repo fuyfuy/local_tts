@@ -39,7 +39,8 @@ tts_local_workflow/
 ├── eval.py                       # QA checker (flags leftover Markdown, page numbers, etc.)
 ├── tts/
 │   ├── llm.py                    # shared clean_chunk / print_timings / clean_file
-│   └── tts.py                    # Stage 3: narration -> audio (Kokoro)
+│   ├── tts.py                    # Stage 3: whole corpus clean/ -> audio/ (Kokoro)
+│   └── say.py                    # Stage 3: one file -> one .wav (Kokoro)
 ├── corpus/
 │   ├── inference-engineering/    # the book
 │   │   ├── raw/   clean/   audio/
@@ -164,29 +165,26 @@ Install once:
 .venv/bin/pip install "kokoro>=0.9.4" soundfile
 ```
 
-Then, one file:
+Then, one file — use `tts/say.py`:
 
-```python
-from pathlib import Path
-import soundfile as sf
-from kokoro import KPipeline
-
-pipeline = KPipeline(lang_code="a")          # 'a'=American, 'b'=British
-text = Path("corpus/inference-engineering/clean/06_chapter-5-techniques.txt").read_text()
-
-with sf.SoundFile("06.wav", "w", 24000, channels=1) as f:
-    for _gs, _ps, audio in pipeline(text, voice="af_heart", speed=1.0,
-                                    split_pattern=r"\n+"):
-        f.write(audio)
-print("wrote 06.wav")
+```bash
+.venv/bin/python tts/say.py corpus/inference-engineering/clean/06_chapter-5-techniques.txt
+.venv/bin/python tts/say.py some.txt --voice af_nova --speed 1.1 --out /tmp/x.wav
 ```
 
-Knobs: `voice` (`af_heart`, `af_nova`, `am_michael`, `bf_emma`, `bm_george`),
-`speed` (0.9–1.1), `split_pattern` (`r"\n+"` = cut on paragraph breaks).
+Writes a 24 kHz mono `.wav` next to the input (`--out` overrides). Knobs:
+`--voice` (`af_heart`, `af_nova`, `am_michael`, `bf_emma`, `bm_george`),
+`--speed` (0.9–1.1), `--lang` (`a`=American, `b`=British). Internally it is just
+`KPipeline(lang_code=...)` fed with `split_pattern=r"\n+"` (cut on paragraph breaks).
 
 ---
 
 ## 7. Model selection
+
+Two separate runners — don't conflate them: **Ollama** runs LLMs (text→text,
+plus vision and embeddings) over HTTP at `:11434`; **Kokoro** is a pip-installed
+PyTorch library (text→audio) with no server. There is no TTS model in
+`ollama list` — audio generation never goes through Ollama.
 
 - **Stage 2 (rewrite) LLM** — local `qwen3.5:9b` (or any Ollama model). A
   capable small model is fine; faithfulness matters (numbers/terms must
