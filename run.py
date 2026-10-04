@@ -1,0 +1,70 @@
+"""Batch-run the whole pipeline for one corpus, PDF/HTML -> compressed audio.
+
+Chains: extract (if the corpus has an extractor) -> clean -> synthesize -> compress.
+
+Usage (from the repo root):
+    python run.py inference-engineering                       # full run, mp3 64k
+    python run.py inference-engineering --format opus --bitrate 48k
+    python run.py inference-engineering --skip-extract        # raw/ already exists
+    python run.py cloudflare-ebpf                             # download + clean + synth + compress
+
+Every stage is idempotent, so re-running skips work that's already done.
+"""
+
+import argparse
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent
+PY = sys.executable  # use the same interpreter that's running this script
+
+
+def run(cmd):
+    print(f"\n$ {' '.join(str(c) for c in cmd)}\n", flush=True)
+    subprocess.run([str(c) for c in cmd], check=True)
+
+
+def main():
+    ap = argparse.ArgumentParser(description="Run the full document-to-audio pipeline.")
+    ap.add_argument("name", help="corpus slug, e.g. inference-engineering")
+    ap.add_argument("--skip-extract", action="store_true")
+    ap.add_argument("--skip-clean", action="store_true")
+    ap.add_argument("--skip-synth", action="store_true")
+    ap.add_argument("--format", default="mp3", choices=["mp3", "opus", "ogg", "m4a"])
+    ap.add_argument("--bitrate", default=None)
+    ap.add_argument("--keep-wav", action="store_true")
+    args = ap.parse_args()
+
+    name = args.name
+    corpus = ROOT / "corpus" / name
+    if not corpus.is_dir():
+        raise SystemExit(f"no corpus at {corpus}")
+
+    extractor = corpus / f"extract_{name}.py"
+    cleaner = corpus / f"clean_{name}.py"
+
+    # Stage 0 — extract (PDF sources have a dedicated extractor; HTML sources
+    # download inside their clean script instead).
+    if not args.skip_extract and extractor.exists():
+        run([PY, extractor])
+
+    # Stage 2 — clean (for the blog this also downloads).
+    if not args.skip_clean and cleaner.exists():
+        run([PY, cleaner])
+
+    # Stage 3 — synthesize WAVs, then compress.
+    if not args.skip_synth:
+        run([PY, ROOT / "tts" / "tts.py", corpus])
+        convert = [PY, ROOT / "tts" / "convert.py", corpus / "audio", "--format", args.format]
+        if args.bitrate:
+            convert += ["--bitrate", args.bitrate]
+        if args.keep_wav:
+            convert += ["--keep-wav"]
+        run(convert)
+
+    print(f"\nall done for '{name}'")
+
+
+if __name__ == "__main__":
+    main()

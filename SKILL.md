@@ -35,20 +35,16 @@ tts_local_workflow/
 ├── SKILL.md                      # this file
 ├── cleanup_prompt.txt            # DEFAULT editing prompt (shared fallback)
 ├── requirements.txt
+├── run.py                        # batch: extract -> clean -> synth -> compress
 ├── prep.py                       # Stage 1 runner (builds PREP.md + sample -> model)
 ├── eval.py                       # QA checker (flags leftover Markdown, page numbers, etc.)
 ├── tts/
 │   ├── llm.py                    # shared clean_chunk / print_timings / clean_file
 │   ├── tts.py                    # Stage 3: whole corpus clean/ -> audio/ (Kokoro)
-│   └── say.py                    # Stage 3: one file -> one .wav (Kokoro)
-├── corpus/
-│   ├── inference-engineering/    # the book
-│   │   ├── raw/   clean/   audio/
-│   │   ├── clean_inference-engineering.py
-│   │   └── extract_inference-engineering.py
-│   └── cloudflare-ebpf/          # the blog series
-│       ├── raw/   clean/   audio/
-│       └── clean_cloudflare-ebpf.py
+│   ├── say.py                    # Stage 3: one file -> one .wav (Kokoro)
+│   └── convert.py                # Stage 3.5: .wav -> .mp3/.opus/.ogg/.m4a (ffmpeg)
+├── corpus/                       # gitignored — local sources/data + per-doc scripts
+│   └── {name}/                   #   raw/ clean/ audio/ + clean_{name}.py
 └── legacy/                       # superseded flat scripts (clean.py, clean_blog.py, ...)
 ```
 
@@ -56,8 +52,9 @@ Rules:
 - `tts/` is document-agnostic. Never put document-specific logic there.
 - `corpus/{name}/clean_{name}.py` is **generated**, and `split()` is the *only*
   document-specific function in it. Everything else comes from `tts.llm`.
-- `raw/` is immutable source. `clean/` and `audio/` are regenerable and
-  gitignored.
+- `corpus/` is gitignored entirely — it holds source PDFs and derived text
+  whose licensing we don't want to audit per commit. It is local-only and
+  regenerable; never `git add` it.
 
 ---
 
@@ -104,14 +101,29 @@ and a short plan. **Review the plan before running.**
 
 Reads `raw/*.md`, writes `clean/*.txt`. Idempotent (skips existing outputs).
 
-### Stage 3 — Synthesize
+### Stage 3 — Synthesize + compress
 
 ```bash
 .venv/bin/python tts/tts.py corpus/inference-engineering
 # reads corpus/.../clean/*.txt -> corpus/.../audio/*.wav (24 kHz mono)
+
+.venv/bin/python tts/convert.py corpus/inference-engineering/audio              # -> .mp3 64k (deletes wav)
+.venv/bin/python tts/convert.py corpus/inference-engineering/audio --format opus --bitrate 48k
 ```
 
-Compress: `ffmpeg -i x.wav -b:a 64k x.mp3`
+Compression needs `ffmpeg` (`sudo apt install ffmpeg`). **Opus 48k mono** is
+best quality/size for speech; **MP3 64k** is the universal-compatibility
+fallback (the default). ~10 h of book ≈ 1.7 GB WAV → ~290 MB MP3 → ~215 MB Opus.
+
+### One command for the whole pipeline
+
+```bash
+.venv/bin/python run.py inference-engineering                        # extract -> clean -> wav -> mp3
+.venv/bin/python run.py inference-engineering --format opus --bitrate 48k
+.venv/bin/python run.py inference-engineering --skip-extract --skip-clean
+```
+
+Every stage is idempotent, so re-running only does the missing work.
 
 ---
 
@@ -153,7 +165,7 @@ Compress: `ffmpeg -i x.wav -b:a 64k x.mp3`
 5. Run `python corpus/my-doc/clean_my-doc.py` and eyeball one output section.
 6. Run `python eval.py` (or a tailored check) to catch leftover Markdown/page
    numbers/dangling lines.
-7. Synthesize: `python tts/tts.py corpus/my-doc`.
+7. Synthesize + compress: `python run.py my-doc` (or `python tts/tts.py corpus/my-doc` for WAV only).
 
 ---
 

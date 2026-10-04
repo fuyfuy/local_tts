@@ -4,11 +4,10 @@ __pycache__/
 *.pyc
 *.pyo
 
-# Generated data (regenerable by running the scripts). Book raw/clean is also
-# derived from a copyrighted PDF, so it is deliberately not committed.
-corpus/*/raw/
-corpus/*/clean/
-corpus/*/audio/
+# corpus/ — local sources (PDFs, extracted text, audio) and per-document
+# scripts. Deliberately not committed: it holds third-party copyrighted
+# material we don't want to audit (or upload) per change.
+corpus/
 
 # Source documents (large + third-party copyright)
 *.pdf
