@@ -1,6 +1,6 @@
 """Shared Stage 2 plumbing: Markdown sections -> spoken narration.
 
-Every generated ``clean_{name}.py`` imports these helpers and supplies its own
+Every generated ``recipes/{name}.py`` imports these helpers and supplies its own
 ``split()`` function. This module owns the parts that must be identical
 everywhere, including the hard-won fixes:
 

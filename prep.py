@@ -1,10 +1,10 @@
 """Stage 1 (Prepare) runner.
 
 Builds a prompt from PREP.md + a sample of a new document, and asks a model
-(local Ollama by default) to produce ``clean_{name}.py`` (+ ``prompt_{name}.txt``
+(local Ollama by default) to produce ``recipes/{name}.py`` (+ ``prompt_{name}.txt``
 if needed) plus a short plan.
 
-Usage (from text-to-voice/):
+Usage (from the repo root):
     python prep.py path/to/doc.md --name my-book            # call local model
     python prep.py path/to/doc.md --name my-book --print    # just print the prompt
     python prep.py path/to/doc.html --name my-blog --model qwen3:8b
@@ -56,7 +56,7 @@ Run Stage 1 (Prepare). Inspect the structure and tell me:
 4. the max chunk size you'd target,
 5. whether a tailored prompt is needed and what it should say.
 
-Then give a 5-10 line plan first, and write clean_{name}.py as a single
+Then give a 5-10 line plan first, and write recipes/{name}.py as a single
 ```python code block```. Import helpers with `from tts import llm` and make
 `split()` the only document-specific logic. Write prompt_{name}.txt only if the
 default prompt needs extending.
@@ -107,9 +107,8 @@ def main():
 
     code = extract_code_block(response)
     if code:
-        dst_dir = ROOT / "corpus" / args.name
-        dst_dir.mkdir(parents=True, exist_ok=True)
-        dst = dst_dir / f"clean_{args.name}.py"
+        dst = ROOT / "recipes" / f"{args.name}.py"
+        dst.parent.mkdir(parents=True, exist_ok=True)
         dst.write_text(code + "\n", encoding="utf-8")
         print(f"\n[saved] {dst}", file=sys.stderr)
     else:

@@ -31,8 +31,8 @@ when spoken by a TTS engine. Everything else is deterministic plumbing.
 | Stage | Name      | Input                     | Output                        | Who does it       |
 |-------|-----------|---------------------------|-------------------------------|-------------------|
 | 0     | Extract   | PDF / HTML / docx         | clean Markdown, one file per chapter/post | deterministic script |
-| 1     | Prepare   | Markdown sample + this doc| `clean_{name}.py`, `prompt_{name}.txt`, a plan | **a model** |
-| 2     | Clean     | Markdown sections         | narration `.txt` per chapter/post | LLM (`clean_{name}.py`) |
+| 1     | Prepare   | Markdown sample + this doc| `recipes/{name}.py`, `prompt_{name}.txt`, a plan | **a model** |
+| 2     | Clean     | Markdown sections         | narration `.txt` per chapter/post | LLM (`recipes/{name}.py`) |
 | 3     | Synthesize| narration `.txt`          | `.wav`/`.mp3`                 | TTS helper |
 
 Stage 0 and Stage 3 are format-specific plumbing. Stages 1–2 are where the
@@ -43,28 +43,29 @@ document-specific intelligence lives, and Stage 1 is what this playbook is for.
 ## 3. Target folder layout
 
 ```
-text-to-voice/
+tts_local_workflow/
+├── skills/document-to-audio/SKILL.md   # the agent skill (how to operate the repo)
 ├── PREP.md                    # this playbook (fed to the prep model)
 ├── cleanup_prompt.txt         # DEFAULT editing prompt (fallback for all docs)
+├── recipes/                   # per-document scripts — TRACKED, uploaded
+│   └── {name}.py              #   the tailored clean script (stage 1 output)
 ├── tts/                       # shared, document-agnostic helpers
 │   ├── llm.py                 #   clean_chunk(), print_timings(), truncation guard
 │   └── tts.py                 #   narration text -> audio
-└── corpus/
+└── corpus/                    # GITIGNORED — local data only
     └── {name}/                # one folder per document/source
         ├── raw/               # stage 0 output: extracted Markdown (.md)
         ├── clean/             # stage 2 output: narration (.txt)
-        ├── audio/             # stage 3 output: final audio
-        ├── prompt_{name}.txt  # tailored editing prompt (optional)
-        └── clean_{name}.py    # tailored script (stage 1 output)
+        └── audio/             # stage 3 output: final audio
 ```
 
 Rules:
 
 - `{name}` is a short slug: `inference-engineering`, `cloudflare-ebpf`,
   `attention-is-all-you-need`.
-- `clean_{name}.py` is **generated**, never hand-written from scratch. It
+- `recipes/{name}.py` is **generated**, never hand-written from scratch. It
   imports the shared helpers from `tts/` and only encodes the decisions that
-  are specific to this document.
+  are specific to this document. It is committed; `corpus/` (data) is not.
 - `prompt_{name}.txt` is optional. Omit it when the default
   `cleanup_prompt.txt` is adequate; create it only to add document-specific
   terminology or pronunciation rules.
@@ -82,7 +83,7 @@ front-matter noise and the body structure).
 
 **Outputs:**
 
-1. `clean_{name}.py` — the tailored script.
+1. `recipes/{name}.py` — the tailored script.
 2. `prompt_{name}.txt` — only if the default prompt needs extending.
 3. A short **plan** (5–10 lines) explaining the decisions, so a human can
    review before anything runs.
@@ -168,7 +169,7 @@ them.
 
 ---
 
-## 6. Contract: what `clean_{name}.py` must expose
+## 6. Contract: what `recipes/{name}.py` must expose
 
 ```python
 NAME     = "{name}"                          # slug, matches the folder
@@ -191,10 +192,10 @@ def main(): ...                              # CLI: [needle] [--clean-only] [--d
 CLI conventions (consistent across all generated scripts):
 
 ```
-python clean_{name}.py               # full run
-python clean_{name}.py 06            # only files matching "06"
-python clean_{name}.py --clean-only  # skip extraction (if the script extracts)
-python clean_{name}.py --download-only
+python recipes/{name}.py               # full run
+python recipes/{name}.py 06            # only files matching "06"
+python recipes/{name}.py --clean-only  # skip extraction (if the script extracts)
+python recipes/{name}.py --download-only
 ```
 
 ---
@@ -242,7 +243,7 @@ Run Stage 1 (Prepare). Inspect the structure and tell me:
 4. the max chunk size you'd target,
 5. whether a tailored prompt is needed and what it should say.
 
-Then write `clean_{name}.py` and (if needed) `prompt_{name}.txt`,
+Then write `recipes/{name}.py` and (if needed) `prompt_{name}.txt`,
 and give me a 5-10 line plan before I run anything.
 ```
 

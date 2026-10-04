@@ -41,8 +41,8 @@ def main():
     if not corpus.is_dir():
         raise SystemExit(f"no corpus at {corpus}")
 
-    extractor = corpus / f"extract_{name}.py"
-    cleaner = corpus / f"clean_{name}.py"
+    extractor = ROOT / "recipes" / f"{name}-extract.py"
+    cleaner = ROOT / "recipes" / f"{name}.py"
 
     # Stage 0 — extract (PDF sources have a dedicated extractor; HTML sources
     # download inside their clean script instead).
