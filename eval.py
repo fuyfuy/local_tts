@@ -1,50 +1,73 @@
+"""Stage 2.5 QA gate: sanity-check cleaned narration against the raw source.
+
+For each ``clean/*.txt`` it flags:
+  * leftover Markdown syntax (``#``, ``**``, backticks, tables, links, URLs)
+  * orphan page numbers (lines that are just digits)
+  * dangling lines (no terminal punctuation)
+  * repeated lines (running headers not stripped)
+  * word-count drift vs the raw source (content lost or invented)
+
+Usage:
+    python eval.py                              # default corpus: inference-engineering
+    python eval.py cloudflare-ebpf              # another corpus
+    python eval.py inference-engineering 06     # one chapter
+    python eval.py --strict                     # exit non-zero if anything is flagged
+
+Exit code: 0 unless ``--strict`` and at least one check was flagged.
+"""
+
+import argparse
 import re
-import sys
 from collections import Counter
 from pathlib import Path
 
-CLEAN = Path("corpus/inference-engineering/clean")   # stage 2 output (cleaned narration)
-IN    = Path("corpus/inference-engineering/raw")     # stage 1 output (raw markdown)
+ROOT = Path(__file__).resolve().parent
+
+# Word-count band (clean/raw). Measured on healthy data: chapters land at
+# 0.97-1.09 (verbalizing "5.1.1" -> "five point one point one" inflates clean a
+# little). Below MIN => content missing; above MAX => content invented.
+WORD_RATIO_MIN = 0.85
+WORD_RATIO_MAX = 1.20
 
 
 def markdown_residue(t):
-    """Counts of leftover Markdown syntax that should have been stripped."""
     patterns = [r"#", r"\*\*", r"`", r"^\s*\|", r"\]\(", r"http"]
     return {p: len(re.findall(p, t, re.M)) for p in patterns}
 
 
 def orphan_numbers(t):
-    """Lines that are just a number — leaked page numbers."""
     return [ln for ln in t.splitlines()
             if re.fullmatch(r"\s*\d{1,4}\s*", ln)]
 
 
 def dangling_lines(t):
-    """Non-empty lines that don't end in terminal punctuation."""
     return [ln.strip() for ln in t.splitlines()
             if ln.strip() and not ln.strip().endswith((".", "?", "!"))]
 
 
 def repeated_lines(t, thr=3):
-    """Long lines that repeat — running headers not stripped."""
     lines = [ln.strip() for ln in t.splitlines() if len(ln.strip()) > 15]
     return [(l, c) for l, c in Counter(lines).items() if c >= thr]
 
 
+def word_ratio(clean_text, raw_text):
+    cw = len(clean_text.split())
+    rw = len(raw_text.split())
+    return cw / max(rw, 1), cw, rw
+
+
 def ok(key, value):
-    """True if the check passes for a clean file."""
     limits = {
         "md_residue":     lambda d: sum(d.values()) == 0,
         "orphan_numbers": lambda n: n == 0,
         "dangling_lines": lambda n: n == 0,
         "repeated_lines": lambda n: n == 0,
-        "length_ratio":   lambda r: 0.5 <= r <= 1.3,
+        "word_ratio":     lambda r: WORD_RATIO_MIN <= r <= WORD_RATIO_MAX,
     }
     return limits[key](value)
 
 
 def fmt(value):
-    """Compact display: dicts show only the non-zero patterns."""
     if isinstance(value, dict):
         hits = {k: n for k, n in value.items() if n}
         return "0" if not hits else str(hits)
@@ -52,28 +75,39 @@ def fmt(value):
 
 
 def main():
-    files = sorted(CLEAN.glob("*.txt"))
+    ap = argparse.ArgumentParser(description="QA-check cleaned narration vs raw source.")
+    ap.add_argument("corpus", nargs="?", default="inference-engineering")
+    ap.add_argument("needle", nargs="?", default=None)
+    ap.add_argument("--strict", action="store_true",
+                    help="exit non-zero if anything is flagged")
+    args = ap.parse_args()
+
+    raw_dir = ROOT / "corpus" / args.corpus / "raw"
+    clean_dir = ROOT / "corpus" / args.corpus / "clean"
+
+    files = sorted(clean_dir.glob("*.txt"))
     if not files:
-        print(f"no cleaned files in {CLEAN}/ — run clean.py first")
-        return
-    if len(sys.argv) > 1:   # e.g. `python eval.py 06` to check one chapter
-        files = [f for f in files if sys.argv[1] in f.stem]
+        print(f"no cleaned files in {clean_dir}/ — run clean first")
+        return 1
+
+    if args.needle:
+        files = [f for f in files if args.needle in f.stem]
 
     total = 0
     for f in files:
         t = f.read_text(encoding="utf-8")
-        src = IN / (f.stem + ".md")
+        src = raw_dir / (f.stem + ".md")
         if not src.exists():
             print(f"\n=== {f.name} ===  (no source .md to compare)")
             continue
 
-        ratio = len(t) / max(len(src.read_text(encoding="utf-8")), 1)
+        ratio, cw, rw = word_ratio(t, src.read_text(encoding="utf-8"))
         report = {
             "md_residue":     markdown_residue(t),
             "orphan_numbers": len(orphan_numbers(t)),
             "dangling_lines": len(dangling_lines(t)),
             "repeated_lines": len(repeated_lines(t)),
-            "length_ratio":   round(ratio, 2),
+            "word_ratio":     ratio,
         }
         flags = sum(not ok(k, v) for k, v in report.items())
         total += flags
@@ -81,10 +115,12 @@ def main():
         print(f"\n=== {f.name} ===  ({flags} check(s) flagged)")
         for k, v in report.items():
             mark = "ok" if ok(k, v) else "  <-- CHECK"
-            print(f"  {k:16} {fmt(v):35} {mark}")
+            disp = f"{v:.2f} ({cw}/{rw} words)" if k == "word_ratio" else fmt(v)
+            print(f"  {k:16} {disp:38} {mark}")
 
     print(f"\n--- {total} check(s) flagged across {len(files)} file(s) ---")
+    return 1 if (args.strict and total) else 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

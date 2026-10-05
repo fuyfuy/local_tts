@@ -31,6 +31,8 @@ def main():
     ap.add_argument("--skip-extract", action="store_true")
     ap.add_argument("--skip-clean", action="store_true")
     ap.add_argument("--skip-synth", action="store_true")
+    ap.add_argument("--skip-eval", action="store_true")
+    ap.add_argument("--strict-eval", action="store_true")
     ap.add_argument("--format", default="mp3", choices=["mp3", "opus", "ogg", "m4a"])
     ap.add_argument("--bitrate", default=None)
     ap.add_argument("--keep-wav", action="store_true")
@@ -52,6 +54,15 @@ def main():
     # Stage 2 — clean (for the blog this also downloads).
     if not args.skip_clean and cleaner.exists():
         run([PY, cleaner])
+
+    # Stage 2.5 — QA gate (warn by default; --strict-eval aborts on flags).
+    if not args.skip_eval:
+        cmd = [PY, ROOT / "eval.py", name] + (["--strict"] if args.strict_eval else [])
+        print(f"\n$ {' '.join(map(str, cmd))}\n", flush=True)
+        rc = subprocess.run([str(c) for c in cmd]).returncode
+        if rc != 0:
+            raise SystemExit("QA gate flagged issues — aborting before synth "
+                             "(re-run with --skip-eval to override)")
 
     # Stage 3 — synthesize WAVs, then compress.
     if not args.skip_synth:
