@@ -24,14 +24,21 @@ def main():
     ap.add_argument("--voice", default="af_heart", help="Kokoro voice id")
     ap.add_argument("--speed", type=float, default=1.0, help="speech rate, 0.9-1.1 typical")
     ap.add_argument("--lang", default="a", help="'a'=American English, 'b'=British")
-    ap.add_argument("--device", default="cpu", choices=["cpu", "cuda"])
+    ap.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
     args = ap.parse_args()
 
     src = Path(args.path)
     text = src.read_text(encoding="utf-8")
     out = Path(args.out) if args.out else src.with_suffix(".wav")
 
-    pipeline = KPipeline(lang_code=args.lang, device=args.device)
+    import torch
+    device = args.device
+    if device == "auto":
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    try:
+        pipeline = KPipeline(lang_code=args.lang, device=device)
+    except torch.cuda.OutOfMemoryError:
+        pipeline = KPipeline(lang_code=args.lang, device="cpu")
     # split_pattern=r"\n+" cuts on blank-line paragraph breaks for smooth prosody.
     with sf.SoundFile(out, "w", SR, channels=1) as f:
         for _gs, _ps, audio in pipeline(text, voice=args.voice, speed=args.speed,

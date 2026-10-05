@@ -2,34 +2,81 @@
 
 Usage:
     python tts/tts.py corpus/inference-engineering   # clean/*.txt -> audio/*.wav
-    python tts/tts.py                                # current dir's clean/ -> audio/
+    python tts/tts.py --device cpu                   # force CPU
+    python tts/tts.py --device auto                  # default: GPU if free, else CPU
 
 Requires:
     pip install "kokoro>=0.9.4" soundfile
 """
 
-import sys
+import argparse
+import json
+import time
+import urllib.request
 from pathlib import Path
 
 import soundfile as sf
+import torch
 from kokoro import KPipeline
 
-VOICE = "af_heart"   # see Kokoro's SAMPLES.md for the full voice list
-SR = 24000           # Kokoro's native sample rate (24 kHz mono)
+VOICE = "af_heart"
+SR = 24000
+
+# Ollama keeps a model resident in VRAM for OLLAMA_KEEP_ALIVE (default 5m)
+# after its last request. We wait that long plus a 2m safety buffer before
+# deciding the GPU is genuinely busy and falling back to CPU.
+OLLAMA_KEEP_ALIVE_S = 5 * 60
+OLLAMA_FLUSH_WAIT_S = OLLAMA_KEEP_ALIVE_S + 2 * 60
+MIN_FREE_VRAM_BYTES = 1.5 * 2**30   # Kokoro needs ~1 GB of headroom
 
 
-def synth_corpus(corpus: Path, device: str = "cpu") -> None:
+def _ollama_busy() -> bool:
+    """True while Ollama has any model resident in VRAM."""
+    try:
+        with urllib.request.urlopen("http://localhost:11434/api/ps", timeout=2) as r:
+            return bool(json.load(r).get("models"))
+    except Exception:
+        return False   # can't reach Ollama — assume the GPU is free
+
+
+def resolve_device(want: str) -> str:
+    """Map ``--device`` to a concrete value.
+
+    ``auto`` (the default) prefers the GPU but only commits to it once Ollama
+    has flushed its VRAM cache (bounded wait) and enough memory is actually
+    free. Otherwise it falls back to CPU.
+    """
+    if want in ("cpu", "cuda"):
+        return want
+    if not torch.cuda.is_available():
+        return "cpu"
+
+    deadline = time.time() + OLLAMA_FLUSH_WAIT_S
+    while time.time() < deadline and _ollama_busy():
+        print(f"    waiting for Ollama to release the GPU "
+              f"({OLLAMA_FLUSH_WAIT_S // 60}m budget) ...", flush=True)
+        time.sleep(10)
+
+    free = torch.cuda.mem_get_info()[0]
+    return "cuda" if free >= MIN_FREE_VRAM_BYTES else "cpu"
+
+
+def synth_corpus(corpus: Path, device: str = "auto") -> None:
     clean_dir = corpus / "clean"
     audio_dir = corpus / "audio"
     audio_dir.mkdir(exist_ok=True)
 
-    # device="cpu" by default: Kokoro is tiny and runs fine on CPU, leaving the
-    # GPU free for Ollama. On a shared 8 GB card the two would otherwise fight.
-    pipeline = KPipeline(lang_code="a", device=device)
+    device = resolve_device(device)
+    try:
+        pipeline = KPipeline(lang_code="a", device=device)
+    except torch.cuda.OutOfMemoryError:
+        print("    CUDA OOM building pipeline — falling back to CPU", flush=True)
+        device, pipeline = "cpu", KPipeline(lang_code="a", device="cpu")
+    print(f"synth device: {device}", flush=True)
 
     files = sorted(clean_dir.glob("*.txt"))
     if not files:
-        print(f"no .txt files in {clean_dir} -- run clean_{corpus.name}.py first")
+        print(f"no .txt files in {clean_dir} — run clean_{corpus.name}.py first")
         return
 
     for txt in files:
@@ -45,13 +92,12 @@ def synth_corpus(corpus: Path, device: str = "cpu") -> None:
             for _gs, _ps, audio in pipeline(text, voice=VOICE, speed=1.0,
                                             split_pattern=r"\n+"):
                 f.write(audio)
-        print(f"wrote {out}")
+        print(f"wrote {out}", flush=True)
 
 
 if __name__ == "__main__":
-    import argparse
     ap = argparse.ArgumentParser(description="Synthesize a corpus's clean/*.txt to WAV.")
     ap.add_argument("corpus", nargs="?", default=".", help="path to the corpus dir")
-    ap.add_argument("--device", default="cpu", choices=["cpu", "cuda"])
+    ap.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
     args = ap.parse_args()
     synth_corpus(Path(args.corpus), device=args.device)
