@@ -18,12 +18,14 @@ VOICE = "af_heart"   # see Kokoro's SAMPLES.md for the full voice list
 SR = 24000           # Kokoro's native sample rate (24 kHz mono)
 
 
-def synth_corpus(corpus: Path) -> None:
+def synth_corpus(corpus: Path, device: str = "cpu") -> None:
     clean_dir = corpus / "clean"
     audio_dir = corpus / "audio"
     audio_dir.mkdir(exist_ok=True)
 
-    pipeline = KPipeline(lang_code="a")   # 'a' = American English, 'b' = British
+    # device="cpu" by default: Kokoro is tiny and runs fine on CPU, leaving the
+    # GPU free for Ollama. On a shared 8 GB card the two would otherwise fight.
+    pipeline = KPipeline(lang_code="a", device=device)
 
     files = sorted(clean_dir.glob("*.txt"))
     if not files:
@@ -47,5 +49,9 @@ def synth_corpus(corpus: Path) -> None:
 
 
 if __name__ == "__main__":
-    corpus = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(".")
-    synth_corpus(corpus)
+    import argparse
+    ap = argparse.ArgumentParser(description="Synthesize a corpus's clean/*.txt to WAV.")
+    ap.add_argument("corpus", nargs="?", default=".", help="path to the corpus dir")
+    ap.add_argument("--device", default="cpu", choices=["cpu", "cuda"])
+    args = ap.parse_args()
+    synth_corpus(Path(args.corpus), device=args.device)
