@@ -11,6 +11,7 @@ REMOVE — these never belong in audio:
 - Footnote and citation markers (superscript digits, "[1]", "(2024)")
 - Hyphenation artifacts ("infer-\nence" -> "inference")
 - All Markdown syntax (#, **, backticks, | table cells, [link](url))
+- HTML underline tags around URLs (drop the <u> and </u>, keep the text between)
 
 VERBALIZE:
 - Headings: "## 5.1 Quantization" -> "Now: section five point one, Quantization."
@@ -20,6 +21,7 @@ VERBALIZE:
 - Equations: render in words ("x squared plus y") or paraphrase the concept.
 - Figure captions: keep only if informative, as "The figure shows ...";
   drop bare "Figure 3:" prefixes.
+- URLs: speak them for audio — "https://baseten.com/careers" becomes "baseten dot com slash careers". Never read the literal "h t t p colon slash slash".
 
 PRONUNCIATION HINTS (spell out what a TTS engine may misread):
 - "e.g." -> "for example", "i.e." -> "that is", "etc." -> "and so on"
