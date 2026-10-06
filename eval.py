@@ -29,6 +29,10 @@ ROOT = Path(__file__).resolve().parent
 WORD_RATIO_MIN = 0.85
 WORD_RATIO_MAX = 1.20
 
+# Files to skip entirely (substring match on filename). e.g. bibliographies /
+# "recommended reading" where URLs and loose formatting are legit content.
+IGNORE_FILES = ["recommended-reading"]
+
 
 def markdown_residue(t):
     patterns = [r"#", r"\*\*", r"`", r"^\s*\|", r"\]\(", r"http"]
@@ -92,6 +96,11 @@ def main():
 
     if args.needle:
         files = [f for f in files if args.needle in f.stem]
+
+    skipped = [f for f in files if any(s in f.name for s in IGNORE_FILES)]
+    files = [f for f in files if f not in skipped]
+    for f in skipped:
+        print(f"skip  {f.name}  (in IGNORE_FILES)")
 
     total = 0
     for f in files:

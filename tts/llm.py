@@ -20,6 +20,11 @@ import requests
 MODEL = "qwen3.5:9b"
 URL = "http://localhost:11434/api/generate"
 
+# Safety net: split any section larger than this into paragraph-sized chunks so
+# it never blows the context window. Flat documents (no sub-headings) otherwise
+# produce one huge section that fails to clean.
+MAX_SECTION_CHARS = 8000
+
 
 def print_timings(t: dict) -> None:
     """Print per-request timing; Ollama 0.34+ puts fields at the top level."""
@@ -62,6 +67,23 @@ def clean_chunk(text, system, *, model=MODEL, url=URL, temp=0.2, num_ctx=8192,
     raise last_err
 
 
+def _chunk(section: str, max_chars: int = MAX_SECTION_CHARS) -> list[str]:
+    """Split an oversized section into sub-chunks at paragraph boundaries."""
+    if len(section) <= max_chars:
+        return [section]
+    paras = section.split("\n\n")
+    chunks, cur, cur_len = [], [], 0
+    for p in paras:
+        if cur and cur_len + len(p) + 2 > max_chars:
+            chunks.append("\n\n".join(cur))
+            cur, cur_len = [], 0
+        cur.append(p)
+        cur_len += len(p) + 2
+    if cur:
+        chunks.append("\n\n".join(cur))
+    return chunks
+
+
 def clean_file(src, dst, split_fn, system, *, model=MODEL, url=URL, temp=0.2,
                num_ctx=8192, timeout=600):
     """Read ``src`` Markdown, split with ``split_fn``, clean, write ``dst``."""
@@ -70,6 +92,7 @@ def clean_file(src, dst, split_fn, system, *, model=MODEL, url=URL, temp=0.2,
         return
 
     sections = split_fn(src.read_text(encoding="utf-8"))
+    sections = [c for sec in sections for c in _chunk(sec)]
     cleaned = []
     for i, sec in enumerate(sections):
         print(f"  [{src.name}] section {i+1}/{len(sections)} "
