@@ -11,3 +11,7 @@ corpus/
 
 # Source documents (large + third-party copyright)
 *.pdf
+
+# Runtime artifacts
+*.log
+*.pid
