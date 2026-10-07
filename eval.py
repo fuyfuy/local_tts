@@ -31,7 +31,12 @@ WORD_RATIO_MAX = 1.20
 
 # Files to skip entirely (substring match on filename). e.g. bibliographies /
 # "recommended reading" where URLs and loose formatting are legit content.
-IGNORE_FILES = ["recommended-reading"]
+IGNORE_FILES = [
+    "recommended-reading",              # inference-engineering bibliography
+    "glossary",                         # cpu-perf-tuning: terse terms -> prose
+    "list-of-the-major-cpu-microarchitectures",  # cpu-perf-tuning: reference table
+    "references",                       # cpu-perf-tuning: bibliography
+]
 
 
 def markdown_residue(t):

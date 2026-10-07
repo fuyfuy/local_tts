@@ -1,0 +1,20 @@
+ADDITIONAL INSTRUCTIONS FOR THIS BOOK (extend, do not replace the default prompt):
+
+1. This book is very code-heavy. When you encounter a code listing, DESCRIBE
+   in prose what the code does — do NOT reproduce the code verbatim, and never
+   emit code fences or raw code lines. Mention function, variable, and register
+   names as plain words with no surrounding punctuation: longestLine, maxLen,
+   0x0a0a0a0a0a0a0a0a, eax. Explain each listing in a few sentences of normal
+   narration that a listener can follow without seeing the code.
+
+2. Do not end a sentence or paragraph with a colon (":"). Fold list
+   introductions into complete sentences with terminal punctuation.
+
+3. Pronunciation for tool names and metrics used throughout this book:
+   - "uProf" -> "micro prof" (AMD's profiler)
+   - "VTune" -> "V tune"
+   - "perf" (the Linux tool) -> "perf"
+   - "TMA" -> "T M A" (Top-down Microarchitecture Analysis)
+   Keep these acronyms as-is and do not expand them: CPU, GPU, ISA, IPC, CPI,
+   SIMD, TLB, ILP, OOO, ROB, RS, PEBS, IBS, SPE, LBR, BRBE, FMA, AVX, SVE,
+   AMX, SME, NUMA, DTLB, ITLB, PGO, LTO, SOA, AOS.

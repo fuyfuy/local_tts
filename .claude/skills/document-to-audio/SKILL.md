@@ -30,7 +30,7 @@ document to an agent.
 | `PREP.md` | the spec handed to the model that writes a new cleanup script | no |
 | `recipes/{name}.py` | the bespoke cleanup script (Stage 2) — the **only** per-document code | **yes** |
 | `recipes/{name}-extract.py` | optional: PDF/HTML → Markdown (Stage 0) | **yes** |
-| `tts/llm.py` | shared LLM plumbing (`clean_chunk`, truncation guard, timings) | no |
+| `tts/llm.py` | shared LLM plumbing (`clean_chunk`, URL→speech, truncation guard, timings) | no |
 | `tts/tts.py` | Stage 3: `clean/*.txt` → `audio/*.wav` (Kokoro) | no |
 | `tts/say.py` | Stage 3: one file → one `.wav` (Kokoro) | no |
 | `tts/convert.py` | Stage 3.5: `.wav` → `.mp3`/`.opus`/`.ogg`/`.m4a` (ffmpeg) | no |
@@ -111,7 +111,13 @@ until the eval gate passes. This loop is the heart of the pipeline.
 
 1. **Get the source into `corpus/{name}/raw/`** as Markdown, one file per chapter/post.
    - PDF: write a `recipes/{name}-extract.py` using `pymupdf4llm` (see
-     `recipes/inference-engineering-extract.py`).
+     `recipes/inference-engineering-extract.py`, or
+     `recipes/cpu-perf-tuning-extract.py`, which also strips running
+     headers/page numbers/`<sup>`/`<mark>`/`<u>` structurally).
+   - Extract the **whole book in one `pymupdf4llm` call**, then split chapters
+     on the `#` headings. `pymupdf4llm` infers heading levels from font sizes,
+     so per-page or per-chapter calls misclassify section headings (`##`) as `#`
+     when a page has no larger heading to compare against.
    - HTML/blog: fetch + extract inside the cleanup script's `--download-only`
      mode (see `recipes/cloudflare-ebpf.py`).
 
@@ -145,13 +151,15 @@ until the eval gate passes. This loop is the heart of the pipeline.
 
 ## 6. Reference cleanup scripts
 
-Two documents have already gone through the loop — use them as templates:
+Three documents have already gone through the loop — use them as templates:
 
 | Script | Source | `split()` decision |
 |--------|--------|--------------------|
 | `recipes/inference-engineering.py` | 259-page book (PDF) | split on `## ` **and** `### ` (`#{2,3} `) so `5.1`, `5.1.3` each get a spoken heading |
 | `recipes/inference-engineering-extract.py` | same book | PDF → Markdown per chapter (`pymupdf4llm`) |
 | `recipes/cloudflare-ebpf.py` | blog series (HTML) | download + extract `<article>`, strip footer noise; split on `## ` and `### ` |
+| `recipes/cpu-perf-tuning.py` | 340-page book (PDF) | split on `## ` and `### `; code-heavy book — `prompt_cpu-perf-tuning.txt` says "describe code in prose, no backticks/verbatim code" |
+| `recipes/cpu-perf-tuning-extract.py` | same book | whole-book `pymupdf4llm` → split on `#`; strips headers/page numbers/citation markers structurally |
 
 ---
 
@@ -177,10 +185,19 @@ Known blind spots, observed on real runs:
   `orphan_numbers` only catches a number on its **own line** — once the model
   folds it into prose, it slips through. If this matters, add a check for
   "section <number>" artifacts, or tighten the prompt.
-- **URLs.** The model verbalizes URLs non-deterministically (some chunks say
-  "arxiv dot org slash abs slash …", others keep the literal `https://…`).
-  The prompt asks for the spoken form, but a deterministic post-clean
-  URL→speech transform is the *robust* fix if this matters (e.g. a bibliography).
+- **URLs.** The model verbalizes URLs non-deterministically, so `clean_chunk`
+  now applies a deterministic backstop — `verbalize_urls()` in `tts/llm.py`
+  rewrites any literal `https://…` left in a response to "domain dot com slash
+  …" before the TTS sees it. Make sure it preserves the trailing sentence
+  punctuation (a URL at line-end must keep its closing period).
+- **`md_residue` `#` false-positive on "C#".** The check matches any `#`, so
+  the C# language (and F#) trips it. Not a real problem — ignore the flag.
+- **`word_ratio` on terse content.** Glossaries, reference tables, and
+  procedural appendices legitimately expand (terms/commands → prose) or
+  condense (bibliographies) far outside the 0.85–1.20 band. Put those files in
+  `IGNORE_FILES` rather than chasing the ratio.
+- **`dangling_lines` on list intros.** A sentence ending in "namely:" (or a
+  colon) before a bulleted list reads fine but is flagged. Cosmetic — ignore.
 
 ---
 
@@ -205,6 +222,15 @@ Known blind spots, observed on real runs:
    the prompt as a last resort.
 7. **Idempotency + retry with backoff** are non-negotiable. Keep `raw/`
    immutable so re-cleaning is always possible.
+8. **`pymupdf4llm` heading levels need whole-book context.** It sizes a heading
+   against the other text on the same page, so per-page (or per-chapter)
+   extraction misclassifies section headings (`##`) as `#`. Extract the whole
+   document in one call, then split chapters on `#`.
+9. **Code-heavy books need a prompt extension.** The default prompt's "read
+   code line-by-line" makes some models dump raw code (dangling lines) or keep
+   backticks around identifiers. For a code-heavy book, add a `prompt_{name}.txt`
+   that says: describe each listing in prose, never reproduce code verbatim,
+   never emit backticks.
 
 ---
 

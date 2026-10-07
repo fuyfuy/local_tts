@@ -13,6 +13,7 @@ everywhere, including the hard-won fixes:
   * Ollama 0.34+ returns timing fields at the top level of the response.
 """
 
+import re
 import time
 
 import requests
@@ -41,6 +42,34 @@ def print_timings(t: dict) -> None:
           flush=True)
 
 
+def verbalize_urls(text: str) -> str:
+    """Rewrite literal ``http(s)://`` URLs in narration to spoken form.
+
+    The model verbalizes most URLs itself but is non-deterministic about it;
+    some chunks keep the literal URL. This is a deterministic backstop that
+    turns ``https://example.com/a/b.html`` into "example dot com slash a slash
+    b dot html" so the TTS engine never has to read "h t t p colon slash slash".
+    """
+    def to_speech(u: str) -> str:
+        s = re.sub(r"^https?://", "", u)
+        # Preserve trailing sentence punctuation (period, comma, closing paren…)
+        # that the regex swallowed along with the URL.
+        tail = ""
+        m = re.match(r"^(.*?)([.,;:!?)\]}'\"']+)$", s)
+        if m:
+            s, tail = m.group(1), m.group(2)
+        s = s.replace(".", " dot ")
+        s = s.replace("/", " slash ")
+        s = s.replace("-", " dash ")
+        s = s.replace("_", " underscore ")
+        return re.sub(r"\s+", " ", s).strip() + tail
+
+    return _URL_RE.sub(lambda m: to_speech(m.group(0)), text)
+
+
+_URL_RE = re.compile(r"https?://[^\s<>\"']+")
+
+
 def clean_chunk(text, system, *, model=MODEL, url=URL, temp=0.2, num_ctx=8192,
                 timeout=600, retries=2):
     """Send one Markdown section to the LLM, return spoken prose."""
@@ -60,7 +89,7 @@ def clean_chunk(text, system, *, model=MODEL, url=URL, temp=0.2, num_ctx=8192,
             if data.get("done_reason") == "length":
                 raise RuntimeError("response truncated (hit context limit)")
             print_timings(data)
-            return data["response"].strip()
+            return verbalize_urls(data["response"].strip())
         except Exception as e:
             last_err = e
             time.sleep(2 * (attempt + 1))
