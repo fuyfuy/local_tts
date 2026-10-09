@@ -22,6 +22,10 @@ from kokoro import KPipeline
 VOICE = "af_heart"
 SR = 24000
 
+# Basename of the optional per-book file: every chapter's WAV concatenated into
+# one file (chapter order), stored alongside the per-chapter files.
+BOOK_FILE = "all_in_one"
+
 # Ollama keeps a model resident in VRAM for OLLAMA_KEEP_ALIVE (default 5m)
 # after its last request. We wait that long plus a 2m safety buffer before
 # deciding the GPU is genuinely busy and falling back to CPU.
@@ -93,6 +97,29 @@ def synth_corpus(corpus: Path, device: str = "auto") -> None:
                                             split_pattern=r"\n+"):
                 f.write(audio)
         print(f"wrote {out}", flush=True)
+
+    # Concatenate every chapter (sorted order) into one per-book file alongside
+    # the per-chapter WAVs. convert.py then compresses it like any other WAV.
+    chapter_wavs = [w for w in sorted(audio_dir.glob("*.wav"))
+                    if w.stem != BOOK_FILE]
+    if len(chapter_wavs) > 1:
+        book_wav = audio_dir / f"{BOOK_FILE}.wav"
+        concat_wavs(chapter_wavs, book_wav)
+        print(f"wrote {book_wav}  ({len(chapter_wavs)} chapters)", flush=True)
+
+
+def concat_wavs(sources: list[Path], dst: Path) -> None:
+    """Concatenate mono WAVs (same sample rate/channels) into a single WAV."""
+    if not sources:
+        return
+    with sf.SoundFile(sources[0]) as first:
+        sr = first.samplerate
+        ch = first.channels
+        subtype = first.subtype
+    with sf.SoundFile(dst, "w", sr, ch, subtype=subtype) as out:
+        for src in sources:
+            with sf.SoundFile(src) as f:
+                out.write(f.read())
 
 
 if __name__ == "__main__":

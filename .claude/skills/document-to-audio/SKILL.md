@@ -31,7 +31,7 @@ document to an agent.
 | `recipes/{name}.py` | the bespoke cleanup script (Stage 2) — the **only** per-document code | **yes** |
 | `recipes/{name}-extract.py` | optional: PDF/HTML → Markdown (Stage 0) | **yes** |
 | `tts/llm.py` | shared LLM plumbing (`clean_chunk`, URL→speech, truncation guard, timings) | no |
-| `tts/tts.py` | Stage 3: `clean/*.txt` → `audio/*.wav` (Kokoro) | no |
+| `tts/tts.py` | Stage 3: `clean/*.txt` → `audio/*.wav` (Kokoro) + per-book `all_in_one.wav` | no |
 | `tts/say.py` | Stage 3: one file → one `.wav` (Kokoro) | no |
 | `tts/convert.py` | Stage 3.5: `.wav` → `.mp3`/`.opus`/`.ogg`/`.m4a` (ffmpeg) | no |
 | `corpus/{name}/` | gitignored data: `raw/` (Markdown), `clean/` (narration), `audio/` | data |
@@ -82,6 +82,9 @@ source -> Markdown -> narration -> audio
 - **Stage 2 — Clean**: the LLM rewrites each Markdown section into spoken prose.
 - **Stage 2.5 — Eval**: `eval.py` sanity-checks the narration against the source.
 - **Stage 3 — Synthesize**: Kokoro turns narration `.txt` into `.wav`, then ffmpeg compresses.
+  `tts/tts.py` also concatenates every chapter's WAV (sorted order) into a single
+  `all_in_one.wav` alongside the per-chapter files, so `convert.py` produces an
+  `all_in_one.<fmt>` per book as well as per chapter.
 
 The LLM's *only* job is Stage 2 (clean). Stages 0, 2.5, and 3 are deterministic.
 
@@ -231,6 +234,19 @@ Known blind spots, observed on real runs:
    backticks around identifiers. For a code-heavy book, add a `prompt_{name}.txt`
    that says: describe each listing in prose, never reproduce code verbatim,
    never emit backticks.
+10. **Never trust the model to drop page numbers/headers — strip them
+    deterministically in `split()`.** When a running header/footer survives to
+    Stage 2 (e.g. `Models **41**`, `4.4 NVIDIA Dynamo **111**`), the LLM will
+    *narrate its own reasoning* about it ("the number forty-one ... should be
+    omitted") instead of silently omitting it, and a footer carrying the *next*
+    section's title gets verbalized as a duplicate heading. `recipes/inference-engineering.py`
+    strips these with regexes in `strip_page_artifacts()` before the model sees
+    them, and drops the chapter preamble (`CHAPTER N` / `# Title` / `Title **NN**`)
+    when real `##` headings follow. **But the chapter number only lives in the
+    `CHAPTER N` line** — so capture it and bake it back into the chapter-title
+    heading (`## **Models**` → `## **Chapter 2: Models**`). Otherwise the model
+    loses the chapter number and latches onto "section 3.4" / "Figure 0.1" in the
+    body, dropping the opening sentences. Prefer this over a prompt instruction.
 
 ---
 
