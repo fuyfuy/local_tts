@@ -18,6 +18,7 @@ sys.path.insert(0, str(ROOT))
 from tts import llm
 
 NAME = "inference-engineering"
+TITLE = "Inference Engineering"
 RAW_DIR = ROOT / "corpus" / NAME / "raw"          # stage 0 output (extracted Markdown)
 CLEAN_DIR = ROOT / "corpus" / NAME / "clean"      # stage 2 output (narration)
 PROMPT = (ROOT / "cleanup_prompt.txt").read_text(encoding="utf-8").strip()
@@ -80,6 +81,7 @@ def main():
         files = [f for f in files if sys.argv[1] in f.stem]
 
     CLEAN_DIR.mkdir(exist_ok=True)
+    (CLEAN_DIR.parent / "title.txt").write_text(TITLE + "\n", encoding="utf-8")
     for src in files:
         llm.clean_file(src, CLEAN_DIR / (src.stem + ".txt"), split, PROMPT)
 

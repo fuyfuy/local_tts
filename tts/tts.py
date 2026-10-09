@@ -11,6 +11,7 @@ Requires:
 
 import argparse
 import json
+import re
 import time
 import urllib.request
 from pathlib import Path
@@ -22,9 +23,21 @@ from kokoro import KPipeline
 VOICE = "af_heart"
 SR = 24000
 
-# Basename of the optional per-book file: every chapter's WAV concatenated into
-# one file (chapter order), stored alongside the per-chapter files.
-BOOK_FILE = "all_in_one"
+# Stem for the optional per-book file: every chapter's WAV concatenated into one
+# file (chapter order), stored alongside the per-chapter files. Named after the
+# document — its title (from corpus/<name>/title.txt, written by the recipe) or
+# the corpus folder name — so each document's audio is identifiable instead of
+# every book landing on the same "all_in_one".
+def _book_stem(corpus: Path) -> str:
+    title = ""
+    title_file = corpus / "title.txt"
+    if title_file.exists():
+        first = title_file.read_text(encoding="utf-8").strip().splitlines()
+        title = first[0].strip() if first else ""
+    stem = (title or corpus.name).strip()
+    # Keep only filename-safe characters (word chars, space, dot, dash, underscore).
+    stem = re.sub(r"[^\w .\-]+", "", stem, flags=re.UNICODE).strip()
+    return stem or corpus.name
 
 # Ollama keeps a model resident in VRAM for OLLAMA_KEEP_ALIVE (default 5m)
 # after its last request. We wait that long plus a 2m safety buffer before
@@ -100,10 +113,11 @@ def synth_corpus(corpus: Path, device: str = "auto") -> None:
 
     # Concatenate every chapter (sorted order) into one per-book file alongside
     # the per-chapter WAVs. convert.py then compresses it like any other WAV.
+    book_stem = _book_stem(corpus)
     chapter_wavs = [w for w in sorted(audio_dir.glob("*.wav"))
-                    if w.stem != BOOK_FILE]
+                    if w.stem != book_stem]
     if len(chapter_wavs) > 1:
-        book_wav = audio_dir / f"{BOOK_FILE}.wav"
+        book_wav = audio_dir / f"{book_stem}.wav"
         concat_wavs(chapter_wavs, book_wav)
         print(f"wrote {book_wav}  ({len(chapter_wavs)} chapters)", flush=True)
 

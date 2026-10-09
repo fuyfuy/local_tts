@@ -31,7 +31,7 @@ document to an agent.
 | `recipes/{name}.py` | the bespoke cleanup script (Stage 2) — the **only** per-document code | **yes** |
 | `recipes/{name}-extract.py` | optional: PDF/HTML → Markdown (Stage 0) | **yes** |
 | `tts/llm.py` | shared LLM plumbing (`clean_chunk`, URL→speech, truncation guard, timings) | no |
-| `tts/tts.py` | Stage 3: `clean/*.txt` → `audio/*.wav` (Kokoro) + per-book `all_in_one.wav` | no |
+| `tts/tts.py` | Stage 3: `clean/*.txt` → `audio/*.wav` (Kokoro) + a per-book file named after the document title | no |
 | `tts/say.py` | Stage 3: one file → one `.wav` (Kokoro) | no |
 | `tts/convert.py` | Stage 3.5: `.wav` → `.mp3`/`.opus`/`.ogg`/`.m4a` (ffmpeg) | no |
 | `corpus/{name}/` | gitignored data: `raw/` (Markdown), `clean/` (narration), `audio/` | data |
@@ -83,8 +83,11 @@ source -> Markdown -> narration -> audio
 - **Stage 2.5 — Eval**: `eval.py` sanity-checks the narration against the source.
 - **Stage 3 — Synthesize**: Kokoro turns narration `.txt` into `.wav`, then ffmpeg compresses.
   `tts/tts.py` also concatenates every chapter's WAV (sorted order) into a single
-  `all_in_one.wav` alongside the per-chapter files, so `convert.py` produces an
-  `all_in_one.<fmt>` per book as well as per chapter.
+  per-book file alongside the per-chapter files, so `convert.py` produces one
+  whole-document audio file per book. The file is named after the document — the
+  title from `corpus/<name>/title.txt` (written by the recipe's `TITLE` constant),
+  falling back to the corpus folder name — so each book's audio is identifiable
+  instead of every book landing on the same `all_in_one`.
 
 The LLM's *only* job is Stage 2 (clean). Stages 0, 2.5, and 3 are deterministic.
 

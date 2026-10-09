@@ -173,6 +173,7 @@ them.
 
 ```python
 NAME     = "{name}"                          # slug, matches the folder
+TITLE    = "Human-Readable Title"            # names the whole-document audio file
 RAW_DIR  = Path("corpus/{name}/raw")         # stage 0 input
 CLEAN_DIR= Path("corpus/{name}/clean")       # stage 2 output
 PROMPT   = "prompt_{name}.txt" or default    # editing instructions
@@ -185,6 +186,11 @@ TIMEOUT  = 600
 def split(md: str) -> list[str]: ...         # document-specific (the ONLY tailored logic)
 def main(): ...                              # CLI: [needle] [--clean-only] [--download-only]
 ```
+
+`TITLE` is the document's human-readable title. `main()` writes it to
+`corpus/{name}/title.txt`, and Stage 3 (`tts/tts.py`) names the concatenated
+whole-document audio file after it (sanitized), so each book's audio is
+identifiable instead of every book landing on `all_in_one`.
 
 `split()` is the one function that changes per document. It implements decision
 #1 and #4 from Section 4. Everything else is imported from `tts/llm.py`.

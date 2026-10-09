@@ -23,6 +23,7 @@ sys.path.insert(0, str(ROOT))
 from tts import llm
 
 NAME = "cloudflare-ebpf"
+TITLE = "Cloudflare eBPF Replatforming"
 RAW_DIR = ROOT / "corpus" / NAME / "raw"          # stage 0 output (extracted Markdown)
 CLEAN_DIR = ROOT / "corpus" / NAME / "clean"      # stage 2 output (narration)
 PROMPT = (ROOT / "cleanup_prompt.txt").read_text(encoding="utf-8").strip()
@@ -144,6 +145,9 @@ def split(md: str) -> list[str]:
 
 
 def main():
+    RAW_DIR.mkdir(parents=True, exist_ok=True)
+    (RAW_DIR.parent / "title.txt").write_text(TITLE + "\n", encoding="utf-8")
+
     args = sys.argv[1:]
     do_download = "--clean-only" not in args
     do_clean = "--download-only" not in args

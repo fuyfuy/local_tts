@@ -23,6 +23,7 @@ sys.path.insert(0, str(ROOT))
 from tts import llm
 
 NAME = "rocksdb-tuning-guide"
+TITLE = "RocksDB Tuning Guide"
 RAW_DIR = ROOT / "corpus" / NAME / "raw"
 CLEAN_DIR = ROOT / "corpus" / NAME / "clean"
 PROMPT = (ROOT / "cleanup_prompt.txt").read_text(encoding="utf-8").strip()
@@ -95,6 +96,7 @@ def main():
 
     if do_clean:
         CLEAN_DIR.mkdir(exist_ok=True)
+        (CLEAN_DIR.parent / "title.txt").write_text(TITLE + "\n", encoding="utf-8")
         for src in sorted(RAW_DIR.glob("*.md")):
             llm.clean_file(src, CLEAN_DIR / (src.stem + ".txt"), split, PROMPT)
 

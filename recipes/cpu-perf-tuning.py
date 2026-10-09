@@ -22,6 +22,7 @@ sys.path.insert(0, str(ROOT))
 from tts import llm
 
 NAME = "cpu-perf-tuning"
+TITLE = "Performance Analysis and Tuning on Modern CPUs"
 RAW_DIR = ROOT / "corpus" / NAME / "raw"          # stage 0 output (extracted Markdown)
 CLEAN_DIR = ROOT / "corpus" / NAME / "clean"      # stage 2 output (narration)
 
@@ -42,6 +43,7 @@ def main():
         files = [f for f in files if sys.argv[1] in f.stem]
 
     CLEAN_DIR.mkdir(exist_ok=True)
+    (CLEAN_DIR.parent / "title.txt").write_text(TITLE + "\n", encoding="utf-8")
     for src in files:
         llm.clean_file(src, CLEAN_DIR / (src.stem + ".txt"), split, PROMPT)
 
