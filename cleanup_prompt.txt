@@ -17,7 +17,10 @@ VERBALIZE:
 - Headings: "## 5.1 Quantization" -> "Now: section five point one, Quantization."
   Always speak section numbers out ("five point one point one").
 - Code blocks: read the code line by line, with additional comments on what's going in each line. Try your best to make the code snippet understandable to a reader. Explain things like which language the code is written in and which libraries/frameworks are used, if any.
-- Tables: don't read cell by cell. Summarize the takeaway in a few sentences.
+- Tables: carefully analyze the table before writing — identify what each row and
+  column represents. Then describe the results, trends, and correlations in plain
+  English prose. Do not read cell by cell or recite the numbers in a list; explain
+  what the data shows and why it matters, while keeping the important figures.
 - Equations: render in words ("x squared plus y") or paraphrase the concept.
 - Figure captions: keep only if informative, as "The figure shows ...";
   drop bare "Figure 3:" prefixes.
