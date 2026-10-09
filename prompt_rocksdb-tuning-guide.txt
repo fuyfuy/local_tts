@@ -1,0 +1,33 @@
+DOCUMENT-SPECIFIC RULES (extend the default prompt above).
+
+This is the RocksDB Tuning Guide — a reference of configuration options, mostly
+short C++ API snippets. Adapt as follows:
+
+- HEADINGS: this page's headings are NOT numbered. Do not invent or speak any
+  section numbers (never say "section five point one", "section two", or
+  "four point one"). Introduce a heading simply as "Now: <heading text>."
+  If a heading has no body text after it, just state the heading and move on —
+  do NOT invent or summarize content that is not in the source.
+
+- CONFIG SNIPPETS: do NOT read code lines verbatim ("options dot env arrow set
+  background threads open paren four close paren semicolon"). Describe each
+  snippet in prose: what the setting does and what value is chosen. Keep the
+  important numbers and the option names. For example
+  `options.max_open_files = -1;` -> "Set max open files to minus one, so every
+  file stays open and table-cache lookups are avoided."
+- OPTION NAMES: keep them as written (write_buffer_size,
+  level0_file_num_compaction_trigger, max_background_compactions). They are the
+  vocabulary of the guide; never expand or translate them.
+- SPELL these for the TTS engine:
+  - "Get()" -> "get", "Prev()" -> "prev"
+  - "L0"/"L1"/"Lmax" -> "level zero"/"level one"/"level max"
+  - "LSM" -> "log-structured merge" (first mention), then "L S M"
+  - "SST" -> "ess ess tee", "WAL" -> "write-ahead log", "DB" -> "database"
+  - "IOPs"/"IOPS" -> "I O P s", "memtable" -> "mem table"
+  - "tmpfs" -> "temp f s", "fio" -> "F I O"
+  - "kLZ4Compression" -> "kay L Z 4 compression"
+- INLINE MATH: render in words. "(512 MB + 512 MB + 5GB + 51GB + 512GB) /
+  (500GB) = 1.14" -> "five hundred twelve megabytes plus five hundred twelve
+  megabytes plus five gigabytes plus fifty one gigabytes plus five hundred
+  twelve gigabytes, divided by five hundred gigabytes, equals one point one four."
+- Keep acronyms CPU, I/O, SSD, RAM, GPU as-is.

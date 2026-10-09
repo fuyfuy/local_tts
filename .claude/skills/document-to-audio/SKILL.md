@@ -123,6 +123,9 @@ until the eval gate passes. This loop is the heart of the pipeline.
      when a page has no larger heading to compare against.
    - HTML/blog: fetch + extract inside the cleanup script's `--download-only`
      mode (see `recipes/cloudflare-ebpf.py`).
+   - GitHub wiki: fetch `https://raw.githubusercontent.com/wiki/<owner>/<repo>/<Page>.md`
+     — it serves clean Markdown, so no HTML parsing (see
+     `recipes/rocksdb-tuning-guide.py`).
 
 2. **Write the cleanup script `recipes/{name}.py`**, either way:
    - run Stage 1: `.venv/bin/python prep.py sample.md --name my-doc --print`
@@ -163,6 +166,8 @@ Three documents have already gone through the loop — use them as templates:
 | `recipes/cloudflare-ebpf.py` | blog series (HTML) | download + extract `<article>`, strip footer noise; split on `## ` and `### ` |
 | `recipes/cpu-perf-tuning.py` | 340-page book (PDF) | split on `## ` and `### `; code-heavy book — `prompt_cpu-perf-tuning.txt` says "describe code in prose, no backticks/verbatim code" |
 | `recipes/cpu-perf-tuning-extract.py` | same book | whole-book `pymupdf4llm` → split on `#`; strips headers/page numbers/citation markers structurally |
+| `recipes/rocksdb.py` | 32-page ACM paper (PDF) | split on `## ` (no `###`); `rocksdb-extract.py` strips ACM running headers, `26:3` page:col markers, citation markers, REFERENCES |
+| `recipes/rocksdb-tuning-guide.py` | GitHub wiki page (single page) | fetch raw Markdown from the wiki endpoint (no HTML parsing); split on `#{2,4} `; `prompt_rocksdb-tuning-guide.txt` verbalizes config snippets as prose |
 
 ---
 
@@ -247,6 +252,14 @@ Known blind spots, observed on real runs:
     heading (`## **Models**` → `## **Chapter 2: Models**`). Otherwise the model
     loses the chapter number and latches onto "section 3.4" / "Figure 0.1" in the
     body, dropping the opening sentences. Prefer this over a prompt instruction.
+11. **Bare headings and unnumbered headings make the model invent content.**
+    A heading with no body text (e.g. `## Possibilities of Performance
+    Bottlenecks.` immediately followed by `### System Metrics`) gets a whole
+    hallucinated paragraph; a document whose headings carry no numbers gets
+    "section five point one"/"section two" invented at random. Add a prompt rule:
+    "these headings are NOT numbered — never invent or speak a section number; if
+    a heading has no body, just state it and move on." (`prompt_rocksdb-tuning-guide.txt`
+    does both.)
 
 ---
 
