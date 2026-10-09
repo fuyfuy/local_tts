@@ -4,7 +4,7 @@ A collection of GitHub wiki pages, fetched as Markdown from the raw wiki
 endpoint (no HTML parsing needed — raw.githubusercontent.com/wiki serves clean
 Markdown). Document-specific logic: the page list (with a numeric prefix that
 sets the all-in-one reading order), wiki-link/image/byline cleanup, and the
-heading-level split. LLM plumbing comes from ``tts.llm``.
+heading-level split. LLM plumbing comes from ``pipeline.clean``.
 
 Usage (from the repo root):
     python recipes/rocksdb-tuning-guide.py               # download + clean all
@@ -22,16 +22,16 @@ import requests
 ROOT = Path(__file__).resolve().parents[1]   # repo root
 sys.path.insert(0, str(ROOT))
 
-from tts import llm
+from pipeline import clean
 
 NAME = "rocksdb-tuning-guide"
 TITLE = "RocksDB Wiki"
 RAW_DIR = ROOT / "corpus" / NAME / "raw"
 CLEAN_DIR = ROOT / "corpus" / NAME / "clean"
-PROMPT = (ROOT / "cleanup_prompt.txt").read_text(encoding="utf-8").strip()
+PROMPT = (ROOT / "prompts" / "cleanup_prompt.txt").read_text(encoding="utf-8").strip()
 
 # Extend the default prompt if a tailored one exists.
-PROMPT_EXT = ROOT / "prompt_rocksdb-tuning-guide.txt"
+PROMPT_EXT = ROOT / "prompts" / "rocksdb-tuning-guide.txt"
 if PROMPT_EXT.exists():
     PROMPT = PROMPT + "\n\n" + PROMPT_EXT.read_text(encoding="utf-8").strip()
 
@@ -129,7 +129,7 @@ def main():
         if needle is not None:
             files = [f for f in files if needle in f.stem]
         for src in files:
-            llm.clean_file(src, CLEAN_DIR / (src.stem + ".txt"), split, PROMPT)
+            clean.clean_file(src, CLEAN_DIR / (src.stem + ".txt"), split, PROMPT)
 
 
 if __name__ == "__main__":

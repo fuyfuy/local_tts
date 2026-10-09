@@ -8,10 +8,10 @@ For each ``clean/*.txt`` it flags:
   * word-count drift vs the raw source (content lost or invented)
 
 Usage:
-    python eval.py                              # default corpus: rocksdb-tuning-guide
-    python eval.py cloudflare-ebpf              # another corpus
-    python eval.py rocksdb-tuning-guide 03      # one file
-    python eval.py --strict                     # exit non-zero if anything is flagged
+    python pipeline/eval.py                              # default corpus: rocksdb-tuning-guide
+    python pipeline/eval.py cloudflare-ebpf              # another corpus
+    python pipeline/eval.py rocksdb-tuning-guide 03      # one file
+    python pipeline/eval.py --strict                     # exit non-zero if anything is flagged
 
 Exit code: 0 unless ``--strict`` and at least one check was flagged.
 """
@@ -21,7 +21,7 @@ import re
 from collections import Counter
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 
 # Word-count band (clean/raw). Measured on healthy data: chapters land at
 # 0.97-1.09 (verbalizing "5.1.1" -> "five point one point one" inflates clean a

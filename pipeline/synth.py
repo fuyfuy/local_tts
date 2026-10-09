@@ -1,9 +1,9 @@
 """Stage 3: narration ``.txt`` -> audio, using Kokoro.
 
 Usage:
-    python tts/tts.py corpus/inference-engineering   # clean/*.txt -> audio/*.wav
-    python tts/tts.py --device cpu                   # force CPU
-    python tts/tts.py --device auto                  # default: GPU if free, else CPU
+    python pipeline/synth.py corpus/rocksdb-tuning-guide   # clean/*.txt -> audio/*.wav
+    python pipeline/synth.py --device cpu                   # force CPU
+    python pipeline/synth.py --device auto                  # default: GPU if free, else CPU
 
 Requires:
     pip install "kokoro>=0.9.4" soundfile

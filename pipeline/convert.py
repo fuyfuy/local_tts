@@ -4,8 +4,8 @@ Our source is mono 24 kHz speech; a lossy codec shrinks it ~10x with no
 audible loss. Uses ffmpeg — from PATH, or the pip-installed static build.
 
 Usage:
-    python tts/convert.py corpus/inference-engineering/audio            # all *.wav in dir
-    python tts/convert.py some.wav --format opus --bitrate 48k
+    python pipeline/convert.py corpus/rocksdb-tuning-guide/audio            # all *.wav in dir
+    python pipeline/convert.py some.wav --format opus --bitrate 48k
 """
 
 import argparse

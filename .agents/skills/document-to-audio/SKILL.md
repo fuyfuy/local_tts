@@ -23,25 +23,25 @@ document to an agent.
 
 | Path | Role | Per-document? |
 |------|------|---------------|
-| `run.py` | batch: extract → clean → eval → synth → compress | no |
-| `prep.py` | Stage 1: feed a sample + `PREP.md` to a model to *generate* a cleanup script | no |
-| `eval.py` | QA gate: flags leftover Markdown, page numbers, dangling lines, word-count drift | no |
-| `cleanup_prompt.txt` | default editing prompt shared by all cleanup scripts | no |
+| `run.py` | batch entry point: extract → clean → eval → synth → compress | no |
+| `pipeline/prep.py` | Stage 1: feed a sample + `PREP.md` to a model to *generate* a cleanup script | no |
+| `pipeline/eval.py` | QA gate: flags leftover Markdown, page numbers, dangling lines, word-count drift | no |
+| `prompts/cleanup_prompt.txt` | default editing prompt shared by all cleanup scripts | no |
 | `PREP.md` | the spec handed to the model that writes a new cleanup script | no |
 | `recipes/{name}.py` | the bespoke cleanup script (Stage 2) — the **only** per-document code | **yes** |
 | `recipes/{name}-extract.py` | optional: PDF/HTML → Markdown (Stage 0) | **yes** |
-| `tts/llm.py` | shared LLM plumbing (`clean_chunk`, URL→speech, truncation guard, timings) | no |
-| `tts/tts.py` | Stage 3: `clean/*.txt` → `audio/*.wav` (Kokoro) + a per-book file named after the document title | no |
-| `tts/say.py` | Stage 3: one file → one `.wav` (Kokoro) | no |
-| `tts/convert.py` | Stage 3.5: `.wav` → `.mp3`/`.opus`/`.ogg`/`.m4a` (ffmpeg) | no |
+| `pipeline/clean.py` | Stage 2: shared LLM plumbing (`clean_chunk`, URL→speech, truncation guard, timings) | no |
+| `pipeline/synth.py` | Stage 3: `clean/*.txt` → `audio/*.wav` (Kokoro) + a per-book file named after the document title | no |
+| `pipeline/say.py` | Stage 3: one file → one `.wav` (Kokoro) | no |
+| `pipeline/convert.py` | Stage 3.5: `.wav` → `.mp3`/`.opus`/`.ogg`/`.m4a` (ffmpeg) | no |
 | `corpus/{name}/` | gitignored data: `raw/` (Markdown), `clean/` (narration), `audio/` | data |
 
 Rules:
 
-- `tts/` is document-agnostic — never put document-specific logic there.
+- `pipeline/` is document-agnostic — never put document-specific logic there.
 - `recipes/{name}.py` is **generated**, never hand-written from scratch;
   `split()` is the *only* document-specific function. Everything else is
-  imported from `tts.llm`.
+  imported from `pipeline.clean`.
 - `corpus/` is fully gitignored — third-party sources and derived audio whose
   licensing we don't want to audit per commit. Never `git add` it.
 
@@ -80,10 +80,10 @@ source -> Markdown -> narration -> audio
 
 - **Stage 0 — Extract**: deterministic PDF/HTML → one Markdown file per chapter/post.
 - **Stage 2 — Clean**: the LLM rewrites each Markdown section into spoken prose.
-- **Stage 2.5 — Eval**: `eval.py` sanity-checks the narration against the source.
+- **Stage 2.5 — Eval**: `pipeline/eval.py` sanity-checks the narration against the source.
 - **Stage 3 — Synthesize**: Kokoro turns narration `.txt` into `.wav`, then ffmpeg compresses.
-  `tts/tts.py` also concatenates every chapter's WAV (sorted order) into a single
-  per-book file alongside the per-chapter files, so `convert.py` produces one
+  `pipeline/synth.py` also concatenates every chapter's WAV (sorted order) into a single
+  per-book file alongside the per-chapter files, so `pipeline/convert.py` produces one
   whole-document audio file per book. The file is named after the document — the
   title from `corpus/<name>/title.txt` (written by the recipe's `TITLE` constant),
   falling back to the corpus folder name — so each book's audio is identifiable
@@ -106,7 +106,7 @@ Flags: `--skip-extract`, `--skip-clean`, `--skip-synth`, `--skip-eval`,
 
 Every stage is idempotent, so re-running only does the missing work.
 
-Single file (no corpus): `.venv/bin/python tts/say.py some.txt --voice af_nova --speed 1.1 --out /tmp/x.wav`
+Single file (no corpus): `.venv/bin/python pipeline/say.py some.txt --voice af_nova --speed 1.1 --out /tmp/x.wav`
 
 ---
 
@@ -137,7 +137,7 @@ reproduced". Two books were dropped from the repo for exactly this reason.
      filename prefix that sets the all-in-one reading order).
 
 2. **Write the cleanup script `recipes/{name}.py`**, either way:
-   - run Stage 1: `.venv/bin/python prep.py sample.md --name my-doc --print`
+   - run Stage 1: `.venv/bin/python pipeline/prep.py sample.md --name my-doc --print`
      → paste the output into your agent/model, which writes the script from
      `PREP.md`'s contract; or
    - write it by hand: copy a reference script (§6) and change `split()`. The
@@ -148,7 +148,7 @@ reproduced". Two books were dropped from the repo for exactly this reason.
 
    ```bash
    .venv/bin/python recipes/my-doc.py          # clean raw/*.md -> clean/*.txt
-   .venv/bin/python eval.py my-doc             # QA gate
+   .venv/bin/python pipeline/eval.py my-doc             # QA gate
    ```
 
    - If eval flags anything (leftover Markdown, dangling line, word-count
@@ -172,11 +172,11 @@ Several documents have already gone through the loop — use them as templates:
 |--------|--------|--------------------|
 | `recipes/cloudflare-ebpf.py` | blog series (HTML) | download + extract `<article>`, strip footer noise; split on `## ` and `### ` |
 | `recipes/rocksdb.py` | 32-page ACM paper (PDF) | split on `## ` (no `###`); `rocksdb-extract.py` strips ACM running headers, `26:3` page:col markers, citation markers, REFERENCES |
-| `recipes/rocksdb-tuning-guide.py` | GitHub wiki (16 pages, multi-page collection) | fetch raw Markdown from the wiki endpoint (no HTML parsing); numeric prefix sets reading order; split on `#{1,4} `; strips wiki links, images, bylines; `prompt_rocksdb-tuning-guide.txt` verbalizes code/config as prose |
+| `recipes/rocksdb-tuning-guide.py` | GitHub wiki (16 pages, multi-page collection) | fetch raw Markdown from the wiki endpoint (no HTML parsing); numeric prefix sets reading order; split on `#{1,4} `; strips wiki links, images, bylines; `prompts/rocksdb-tuning-guide.txt` verbalizes code/config as prose |
 
 ---
 
-## 7. What `eval.py` checks (and its blind spots)
+## 7. What `pipeline/eval.py` checks (and its blind spots)
 
 Per `clean/*.txt` file it flags:
 
@@ -188,7 +188,7 @@ Per `clean/*.txt` file it flags:
 | `repeated_lines` | a running header not stripped (a line appearing ≥3×) |
 | `word_ratio` | content lost or invented vs the raw source (band 0.85–1.20) |
 
-`IGNORE_FILES` (in `eval.py`) skips files like `recommended-reading`, where
+`IGNORE_FILES` (in `pipeline/eval.py`) skips files like `recommended-reading`, where
 URLs and loose formatting are legitimate content (bibliographies, etc.).
 
 Known blind spots, observed on real runs:
@@ -199,7 +199,7 @@ Known blind spots, observed on real runs:
   folds it into prose, it slips through. If this matters, add a check for
   "section <number>" artifacts, or tighten the prompt.
 - **URLs.** The model verbalizes URLs non-deterministically, so `clean_chunk`
-  now applies a deterministic backstop — `verbalize_urls()` in `tts/llm.py`
+  now applies a deterministic backstop — `verbalize_urls()` in `pipeline/clean.py`
   rewrites any literal `https://…` left in a response to "domain dot com slash
   …" before the TTS sees it. It verbalizes URL punctuation (`.` `/` `-` `_` `#`
   `?` `=` `&`) and drops a bare `https`/`http` scheme word the model sometimes
@@ -243,7 +243,7 @@ Known blind spots, observed on real runs:
    document in one call, then split chapters on `#`.
 9. **Code-heavy books need a prompt extension.** The default prompt's "read
    code line-by-line" makes some models dump raw code (dangling lines) or keep
-   backticks around identifiers. For a code-heavy book, add a `prompt_{name}.txt`
+   backticks around identifiers. For a code-heavy book, add a `prompts/{name}.txt`
    that says: describe each listing in prose, never reproduce code verbatim,
    never emit backticks.
 10. **Never trust the model to drop page numbers/headers — strip them
@@ -262,7 +262,7 @@ Known blind spots, observed on real runs:
     hallucinated paragraph; a document whose headings carry no numbers gets
     "section five point one"/"section two" invented at random. Add a prompt rule:
     "these headings are NOT numbered — never invent or speak a section number; if
-    a heading has no body, just state it and move on." (`prompt_rocksdb-tuning-guide.txt`
+    a heading has no body, just state it and move on." (`prompts/rocksdb-tuning-guide.txt`
     does both.)
 
 ---
@@ -271,10 +271,10 @@ Known blind spots, observed on real runs:
 
 ### Rewrite LLM (Stage 2)
 
-- **Local (default)** — `qwen3.5:9b` via Ollama. Set `MODEL` in `tts/llm.py`
+- **Local (default)** — `qwen3.5:9b` via Ollama. Set `MODEL` in `pipeline/clean.py`
   (or per-recipe). Faithfulness matters (numbers/terms must survive); disable
   thinking (`"think": False`).
-- **Cloud** — the LLM call lives in one place, `tts/llm.py` (`clean_chunk`), so
+- **Cloud** — the LLM call lives in one place, `pipeline/clean.py` (`clean_chunk`), so
   switching to an OpenAI-compatible endpoint (Claude/GPT) means editing that
   single HTTP call. A frontier model gives the most faithful rewrite; a budget
   model is fine for this mechanical job. Avoid reasoning models — 3–10× the
@@ -298,8 +298,8 @@ Known blind spots, observed on real runs:
 | No timing lines printed | Ollama 0.34+ moved timings top-level | read top-level fields, not `data["timings"]` |
 | `skip ... (already cleaned)` but want redo | output exists | delete the `clean/*.txt` and re-run |
 | Kokoro mispronounces a term ("matmul", "LoRA") | grapheme-to-phoneme guessed wrong | spell it out in the cleaned text |
-| `prep.py` truncates | prompt too big for local model | smaller sample, or a hosted model |
-| `tts.py` waits ~7 min before synthesizing | waiting for Ollama to flush its VRAM cache before committing to the GPU | let it wait; it falls back to CPU if VRAM is tight |
+| `pipeline/prep.py` truncates | prompt too big for local model | smaller sample, or a hosted model |
+| `pipeline/synth.py` waits ~7 min before synthesizing | waiting for Ollama to flush its VRAM cache before committing to the GPU | let it wait; it falls back to CPU if VRAM is tight |
 
 ---
 

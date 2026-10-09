@@ -2,7 +2,7 @@
 
 Document-specific logic: the list of posts, the HTML -> Markdown extractor
 (Stage 0), and the heading-level split (Stage 2). LLM plumbing comes from
-``tts.llm``.
+``pipeline.clean``.
 
 Usage (from the repo root):
     python recipes/cloudflare-ebpf.py               # download + clean
@@ -20,13 +20,13 @@ import requests
 ROOT = Path(__file__).resolve().parents[1]   # repo root
 sys.path.insert(0, str(ROOT))
 
-from tts import llm
+from pipeline import clean
 
 NAME = "cloudflare-ebpf"
 TITLE = "Cloudflare eBPF Replatforming"
 RAW_DIR = ROOT / "corpus" / NAME / "raw"          # stage 0 output (extracted Markdown)
 CLEAN_DIR = ROOT / "corpus" / NAME / "clean"      # stage 2 output (narration)
-PROMPT = (ROOT / "cleanup_prompt.txt").read_text(encoding="utf-8").strip()
+PROMPT = (ROOT / "prompts" / "cleanup_prompt.txt").read_text(encoding="utf-8").strip()
 
 POSTS = [
     "https://ebpf.io/blog/cloudflare-replatforming-1/",
@@ -164,7 +164,7 @@ def main():
         if needle is not None:
             files = [f for f in files if needle in f.stem]
         for src in files:
-            llm.clean_file(src, CLEAN_DIR / (src.stem + ".txt"), split, PROMPT)
+            clean.clean_file(src, CLEAN_DIR / (src.stem + ".txt"), split, PROMPT)
 
 
 if __name__ == "__main__":

@@ -102,7 +102,7 @@
                                                                                                                                                                                               
  Two layers: cheap automated checks (catch the objective failures) and a human listen test (the real verdict).                                                                                
                                                                                                                                                                                               
- ### Automated checks — eval.py                                                                                                                                                               
+ ### Automated checks — pipeline/eval.py                                                                                                                                                               
                                                                                                                                                                                               
  ```python                                                                                                                                                                                    
    import re                                                                                                                                                                                  
@@ -200,7 +200,7 @@
  4. The "best model" bake-off                                                                                                                                                                 
                                                                                                                                                                                               
  To actually pick a model rather than trust my table: grab the same 3 representative sections, run them through qwen3:8b and llama3.1:8b (and qwen2.5:14b if you're patient) with the         
- identical prompt, then run eval.py and the listen test on both. The one with fewer flags and better listen scores wins. It's ~15 minutes of your time and settles it on your text, which is  
+ identical prompt, then run pipeline/eval.py and the listen test on both. The one with fewer flags and better listen scores wins. It's ~15 minutes of your time and settles it on your text, which is  
  the only benchmark that matters here.                                                                                                                                                        
                                                                                                                                                                                               
  Want me to draft the Kokoro TTS stage next, so the pipeline runs end-to-end?            

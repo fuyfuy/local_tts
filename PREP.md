@@ -31,7 +31,7 @@ when spoken by a TTS engine. Everything else is deterministic plumbing.
 | Stage | Name      | Input                     | Output                        | Who does it       |
 |-------|-----------|---------------------------|-------------------------------|-------------------|
 | 0     | Extract   | PDF / HTML / docx         | clean Markdown, one file per chapter/post | deterministic script |
-| 1     | Prepare   | Markdown sample + this doc| `recipes/{name}.py`, `prompt_{name}.txt`, a plan | **a model** |
+| 1     | Prepare   | Markdown sample + this doc| `recipes/{name}.py`, `prompts/{name}.txt`, a plan | **a model** |
 | 2     | Clean     | Markdown sections         | narration `.txt` per chapter/post | LLM (`recipes/{name}.py`) |
 | 3     | Synthesize| narration `.txt`          | `.wav`/`.mp3`                 | TTS helper |
 
@@ -44,14 +44,21 @@ document-specific intelligence lives, and Stage 1 is what this playbook is for.
 
 ```
 tts_local_workflow/
-├── .claude/skills/document-to-audio/SKILL.md   # the agent skill (how to operate the repo)
+├── .agents/skills/document-to-audio/SKILL.md  # the agent skill (how to operate the repo)
 ├── PREP.md                    # this playbook (fed to the prep model)
-├── cleanup_prompt.txt         # DEFAULT editing prompt (fallback for all docs)
+├── run.py                     # batch entry point: extract → clean → eval → synth → compress
 ├── recipes/                   # per-document scripts — TRACKED, uploaded
 │   └── {name}.py              #   the tailored clean script (stage 1 output)
-├── tts/                       # shared, document-agnostic helpers
-│   ├── llm.py                 #   clean_chunk(), print_timings(), truncation guard
-│   └── tts.py                 #   narration text -> audio
+├── pipeline/                  # shared, document-agnostic stage code
+│   ├── clean.py               #   clean_chunk(), print_timings(), truncation guard
+│   ├── synth.py               #   narration text -> audio (Kokoro)
+│   ├── pipeline/convert.py             #   wav -> compressed audio (ffmpeg)
+│   ├── pipeline/eval.py                #   QA gate
+│   ├── pipeline/prep.py                #   Stage 1 runner (this playbook -> a recipe)
+│   └── pipeline/say.py                 #   one-off: one text file -> one wav
+├── prompts/                   # editing prompts
+│   ├── prompts/cleanup_prompt.txt     #   default editing prompt (fallback for all docs)
+│   └── {name}.txt             #   optional per-document extension
 └── corpus/                    # GITIGNORED — local data only
     └── {name}/                # one folder per document/source
         ├── raw/               # stage 0 output: extracted Markdown (.md)
@@ -64,11 +71,12 @@ Rules:
 - `{name}` is a short slug: `rocksdb-tuning-guide`, `cloudflare-ebpf`,
   `attention-is-all-you-need`.
 - `recipes/{name}.py` is **generated**, never hand-written from scratch. It
-  imports the shared helpers from `tts/` and only encodes the decisions that
-  are specific to this document. It is committed; `corpus/` (data) is not.
-- `prompt_{name}.txt` is optional. Omit it when the default
-  `cleanup_prompt.txt` is adequate; create it only to add document-specific
-  terminology or pronunciation rules.
+  imports the shared helpers from `pipeline/` (`from pipeline import clean`) and
+  only encodes the decisions that are specific to this document. It is
+  committed; `corpus/` (data) is not.
+- `prompts/{name}.txt` is optional. Omit it when the default
+  `prompts/cleanup_prompt.txt` is adequate; create it only to add
+  document-specific terminology or pronunciation rules.
 - `raw/` is treated as immutable source. Cleaning is idempotent and cheap to
   re-run, so you can always regenerate `clean/` and `audio/` without touching
   Stage 0.
@@ -84,7 +92,7 @@ front-matter noise and the body structure).
 **Outputs:**
 
 1. `recipes/{name}.py` — the tailored script.
-2. `prompt_{name}.txt` — only if the default prompt needs extending.
+2. `prompts/{name}.txt` — only if the default prompt needs extending.
 3. A short **plan** (5–10 lines) explaining the decisions, so a human can
    review before anything runs.
 
@@ -121,7 +129,7 @@ front-matter noise and the body structure).
 5. **Terminology / pronunciation.** Acronyms to keep as-is (GPU, CPU, RAM),
    ambiguous ones to spell out, symbols to verbalize (`->` → "leads to",
    `×` → "times"), and how section numbers are spoken ("five point one point
-   three"). Goes into `prompt_{name}.txt` as an extension of the default
+   three"). Goes into `prompts/{name}.txt` as an extension of the default
    prompt.
 
 ---
@@ -164,7 +172,7 @@ them.
    always be possible from source.
 
 8. **One shared `clean_chunk`.** Don't copy-paste the LLM plumbing into every
-   generated script — import it from `tts/llm.py`. The generated script only
+   generated script — import it from `pipeline/clean.py`. The generated script only
    encodes the document-specific `split()` and paths.
 
 ---
@@ -176,7 +184,7 @@ NAME     = "{name}"                          # slug, matches the folder
 TITLE    = "Human-Readable Title"            # names the whole-document audio file
 RAW_DIR  = Path("corpus/{name}/raw")         # stage 0 input
 CLEAN_DIR= Path("corpus/{name}/clean")       # stage 2 output
-PROMPT   = "prompt_{name}.txt" or default    # editing instructions
+PROMPT   = "prompts/{name}.txt" or default    # editing instructions
 MODEL    = "qwen3.5:9b"
 URL      = "http://localhost:11434/api/generate"
 TEMP     = 0.2
@@ -188,12 +196,12 @@ def main(): ...                              # CLI: [needle] [--clean-only] [--d
 ```
 
 `TITLE` is the document's human-readable title. `main()` writes it to
-`corpus/{name}/title.txt`, and Stage 3 (`tts/tts.py`) names the concatenated
+`corpus/{name}/title.txt`, and Stage 3 (`pipeline/synth.py`) names the concatenated
 whole-document audio file after it (sanitized), so each book's audio is
 identifiable instead of every book landing on `all_in_one`.
 
 `split()` is the one function that changes per document. It implements decision
-#1 and #4 from Section 4. Everything else is imported from `tts/llm.py`.
+#1 and #4 from Section 4. Everything else is imported from `pipeline/clean.py`.
 
 CLI conventions (consistent across all generated scripts):
 
@@ -208,7 +216,7 @@ python recipes/{name}.py --download-only
 
 ## 7. Shared helpers (`tts/`)
 
-**`tts/llm.py`** — the document-agnostic LLM plumbing:
+**`pipeline/clean.py`** — the document-agnostic LLM plumbing:
 
 ```python
 def clean_chunk(text, system, model=..., url=..., temp=..., num_ctx=...,
@@ -218,12 +226,12 @@ def clean_chunk(text, system, model=..., url=..., temp=..., num_ctx=...,
     # returns response.strip()
 ```
 
-**`tts/tts.py`** — narration `.txt` → audio files (the Stage 3 helper).
+**`pipeline/synth.py`** — narration `.txt` → audio files (the Stage 3 helper).
 
-**`cleanup_prompt.txt`** — the default editing prompt. It already encodes the
+**`prompts/cleanup_prompt.txt`** — the default editing prompt. It already encodes the
 "remove Markdown noise / verbalize headings / read code line-by-line /
 summarize tables / render equations in words" rules, and the standard
-pronunciation hints. Per-document `prompt_{name}.txt` files **extend** it, they
+pronunciation hints. Per-document `prompts/{name}.txt` files **extend** it, they
 don't replace it.
 
 ---
@@ -249,7 +257,7 @@ Run Stage 1 (Prepare). Inspect the structure and tell me:
 4. the max chunk size you'd target,
 5. whether a tailored prompt is needed and what it should say.
 
-Then write `recipes/{name}.py` and (if needed) `prompt_{name}.txt`,
+Then write `recipes/{name}.py` and (if needed) `prompts/{name}.txt`,
 and give me a 5-10 line plan before I run anything.
 ```
 

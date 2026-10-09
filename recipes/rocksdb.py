@@ -15,13 +15,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]   # repo root
 sys.path.insert(0, str(ROOT))
 
-from tts import llm
+from pipeline import clean
 
 NAME = "rocksdb"
 TITLE = "RocksDB: Evolution of Development Priorities"
 RAW_DIR = ROOT / "corpus" / NAME / "raw"
 CLEAN_DIR = ROOT / "corpus" / NAME / "clean"
-PROMPT = (ROOT / "cleanup_prompt.txt").read_text(encoding="utf-8").strip()
+PROMPT = (ROOT / "prompts" / "cleanup_prompt.txt").read_text(encoding="utf-8").strip()
 
 
 def split(md: str) -> list[str]:
@@ -38,7 +38,7 @@ def main():
     CLEAN_DIR.mkdir(exist_ok=True)
     (CLEAN_DIR.parent / "title.txt").write_text(TITLE + "\n", encoding="utf-8")
     for src in files:
-        llm.clean_file(src, CLEAN_DIR / (src.stem + ".txt"), split, PROMPT)
+        clean.clean_file(src, CLEAN_DIR / (src.stem + ".txt"), split, PROMPT)
 
 
 if __name__ == "__main__":

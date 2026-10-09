@@ -48,7 +48,8 @@ for txt in sorted(Path("clean").glob("*.txt")):
     print(f"wrote {out}")
 ```
 
-Run: `.venv/bin/python3 tts.py` (save the snippet above as `tts.py`).
+Run: this is `pipeline/synth.py` (a whole corpus) or `pipeline/say.py` (one file);
+the snippet above is illustrative of what those scripts do.
 
 ## Knobs worth knowing
 

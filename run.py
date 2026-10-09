@@ -57,7 +57,7 @@ def main():
 
     # Stage 2.5 — QA gate (warn by default; --strict-eval aborts on flags).
     if not args.skip_eval:
-        cmd = [PY, ROOT / "eval.py", name] + (["--strict"] if args.strict_eval else [])
+        cmd = [PY, ROOT / "pipeline" / "eval.py", name] + (["--strict"] if args.strict_eval else [])
         print(f"\n$ {' '.join(map(str, cmd))}\n", flush=True)
         rc = subprocess.run([str(c) for c in cmd]).returncode
         if rc != 0:
@@ -66,8 +66,8 @@ def main():
 
     # Stage 3 — synthesize WAVs, then compress.
     if not args.skip_synth:
-        run([PY, ROOT / "tts" / "tts.py", corpus])
-        convert = [PY, ROOT / "tts" / "convert.py", corpus / "audio", "--format", args.format]
+        run([PY, ROOT / "pipeline" / "synth.py", corpus])
+        convert = [PY, ROOT / "pipeline" / "convert.py", corpus / "audio", "--format", args.format]
         if args.bitrate:
             convert += ["--bitrate", args.bitrate]
         if args.keep_wav:

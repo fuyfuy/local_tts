@@ -1,9 +1,9 @@
 """Convert one text file to speech with Kokoro (single-file TTS).
 
 Usage:
-    python tts/say.py path/to/file.txt
-    python tts/say.py path/to/file.txt --voice af_nova --speed 1.1
-    python tts/say.py path/to/file.txt --out /tmp/chapter6.wav
+    python pipeline/say.py path/to/file.txt
+    python pipeline/say.py path/to/file.txt --voice af_nova --speed 1.1
+    python pipeline/say.py path/to/file.txt --out /tmp/chapter6.wav
 
 Output defaults to a 24 kHz mono .wav next to the input file.
 """

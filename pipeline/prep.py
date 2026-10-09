@@ -5,9 +5,9 @@ Builds a prompt from PREP.md + a sample of a new document, and asks a model
 if needed) plus a short plan.
 
 Usage (from the repo root):
-    python prep.py path/to/doc.md --name my-book            # call local model
-    python prep.py path/to/doc.md --name my-book --print    # just print the prompt
-    python prep.py path/to/doc.html --name my-blog --model qwen3:8b
+    python pipeline/prep.py path/to/doc.md --name my-book            # call local model
+    python pipeline/prep.py path/to/doc.md --name my-book --print    # just print the prompt
+    python pipeline/prep.py path/to/doc.html --name my-blog --model qwen3:8b
 """
 
 import argparse
@@ -17,7 +17,7 @@ from pathlib import Path
 
 import requests
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 PREP = (ROOT / "PREP.md").read_text(encoding="utf-8")
 
 MODEL = "qwen3.5:9b"
@@ -57,7 +57,7 @@ Run Stage 1 (Prepare). Inspect the structure and tell me:
 5. whether a tailored prompt is needed and what it should say.
 
 Then give a 5-10 line plan first, and write recipes/{name}.py as a single
-```python code block```. Import helpers with `from tts import llm` and make
+```python code block```. Import helpers with `from pipeline import clean` and make
 `split()` the only document-specific logic. Write prompt_{name}.txt only if the
 default prompt needs extending.
 """
