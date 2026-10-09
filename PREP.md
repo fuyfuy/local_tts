@@ -44,7 +44,7 @@ document-specific intelligence lives, and Stage 1 is what this playbook is for.
 
 ```
 tts_local_workflow/
-├── .agents/skills/document-to-audio/SKILL.md  # the agent skill (how to operate the repo)
+├── .claude/skills/document-to-audio/SKILL.md  # the agent skill (how to operate the repo)
 ├── PREP.md                    # this playbook (fed to the prep model)
 ├── run.py                     # batch entry point: extract → clean → eval → synth → compress
 ├── recipes/                   # per-document scripts — TRACKED, uploaded

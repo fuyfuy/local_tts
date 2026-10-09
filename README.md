@@ -22,12 +22,12 @@ pipeline/         # shared, document-agnostic stage code
 recipes/          # per-document scripts (the only document-specific code)
 prompts/          # editing prompts (cleanup_prompt.txt + per-doc extensions)
 docs/             # notes (Kokoro usage, historical design drafts)
-.agents/          # cross-agent skill: how to operate the repo
+.claude/          # agent skill: how to operate the repo
 corpus/           # GITIGNORED — sources, extracted text, audio
 ```
 
 - **Docs** — `AGENTS.md` (agent instructions), `PREP.md` (recipe-generation spec).
-- **Operational guide** — `.agents/skills/document-to-audio/SKILL.md`.
+- **Operational guide** — `.claude/skills/document-to-audio/SKILL.md`.
 
 ## Licensing
 

@@ -5,7 +5,7 @@ long-form document (book, blog series, paper) into spoken narration, then audio,
 using only local models — Ollama for the text rewrite, Kokoro for the voice.
 
 - **Operational guide** (how to run / debug / extend): the skill at
-  `.agents/skills/document-to-audio/SKILL.md`.
+  `.claude/skills/document-to-audio/SKILL.md`.
 - **Spec for generating a new per-document script**: `PREP.md`.
 - **Quick start**: `python run.py <corpus-name>` chains extract → clean →
   synthesize → compress. Data lives in gitignored `corpus/`; per-document
@@ -22,7 +22,7 @@ something new, change how a stage works, hit a bug and fix it, add a command
 or flag, or learn anything else that would matter to a future agent, update the
 relevant skill **immediately and without being prompted**.
 
-For this repo that means `.agents/skills/document-to-audio/SKILL.md` — and
+For this repo that means `.claude/skills/document-to-audio/SKILL.md` — and
 `PREP.md` if the change affects how a new per-document script is generated.
 
 This is a general rule, not specific to this project: in *any* session where a
