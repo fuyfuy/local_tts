@@ -1,33 +1,42 @@
 DOCUMENT-SPECIFIC RULES (extend the default prompt above).
 
-This is the RocksDB Tuning Guide — a reference of configuration options, mostly
-short C++ API snippets. Adapt as follows:
+This is a collection of RocksDB wiki pages: architecture overviews,
+configuration guides, and C++ API references. Adapt as follows:
 
-- HEADINGS: this page's headings are NOT numbered. Do not invent or speak any
-  section numbers (never say "section five point one", "section two", or
-  "four point one"). Introduce a heading simply as "Now: <heading text>."
-  If a heading has no body text after it, just state the heading and move on —
-  do NOT invent or summarize content that is not in the source.
+- HEADINGS: Introduce each heading as "Now: <heading text>." — the heading text
+  ONLY, with no "section" lead-in and no invented numbers. The ONLY time you
+  speak a number is when the heading text itself begins with one, e.g.
+  "## 1. Introduction" -> "Now: section one, Introduction." Never prefix a
+  heading with a number it does not have (never "section two", "two point one",
+  etc.). If a heading has no body text after it, just state the heading and move
+  on — do NOT invent or summarize content that is not in the source.
 
-- CONFIG SNIPPETS: do NOT read code lines verbatim ("options dot env arrow set
+- CODE SNIPPETS: do NOT read code lines verbatim ("options dot env arrow set
   background threads open paren four close paren semicolon"). Describe each
-  snippet in prose: what the setting does and what value is chosen. Keep the
-  important numbers and the option names. For example
-  `options.max_open_files = -1;` -> "Set max open files to minus one, so every
-  file stays open and table-cache lookups are avoided."
-- OPTION NAMES: keep them as written (write_buffer_size,
-  level0_file_num_compaction_trigger, max_background_compactions). They are the
-  vocabulary of the guide; never expand or translate them.
+  snippet in prose: what it does and what values are used, keeping the important
+  numbers and identifiers. Never emit backticks.
+
+- NAMES/TERMS: keep class, option, and API names as written (write_buffer_size,
+  rocksdb::NewLRUCache, DB::Get, CompactRange). They are the vocabulary of these
+  pages; never expand or translate them.
+
+- NOTE/WARNING BANNERS: keep them as plain prose starting with "Note:" — they
+  are important caveats (e.g. a page marked obsolete).
+
 - SPELL these for the TTS engine:
-  - "Get()" -> "get", "Prev()" -> "prev"
+  - "Get()"/"Get" -> "get", "Put" -> "put", "Delete" -> "delete",
+    "Merge" -> "merge", "Prev()"/"Prev" -> "prev"
   - "L0"/"L1"/"Lmax" -> "level zero"/"level one"/"level max"
   - "LSM" -> "log-structured merge" (first mention), then "L S M"
   - "SST" -> "ess ess tee", "WAL" -> "write-ahead log", "DB" -> "database"
-  - "IOPs"/"IOPS" -> "I O P s", "memtable" -> "mem table"
-  - "tmpfs" -> "temp f s", "fio" -> "F I O"
+  - "IO"/"I/O" -> "I O", "IOPS" -> "I O P S", "memtable" -> "mem table"
+  - "tmpfs" -> "temp f s", "fio" -> "F I O", "db_bench" -> "d b bench"
+  - "sst_dump" -> "ess ess tee dump", "ldb" -> "ell dee bee"
   - "kLZ4Compression" -> "kay L Z 4 compression"
+
 - INLINE MATH: render in words. "(512 MB + 512 MB + 5GB + 51GB + 512GB) /
   (500GB) = 1.14" -> "five hundred twelve megabytes plus five hundred twelve
   megabytes plus five gigabytes plus fifty one gigabytes plus five hundred
   twelve gigabytes, divided by five hundred gigabytes, equals one point one four."
-- Keep acronyms CPU, I/O, SSD, RAM, GPU as-is.
+
+- Keep acronyms CPU, SSD, RAM, GPU as-is.

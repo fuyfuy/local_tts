@@ -128,7 +128,8 @@ until the eval gate passes. This loop is the heart of the pipeline.
      mode (see `recipes/cloudflare-ebpf.py`).
    - GitHub wiki: fetch `https://raw.githubusercontent.com/wiki/<owner>/<repo>/<Page>.md`
      — it serves clean Markdown, so no HTML parsing (see
-     `recipes/rocksdb-tuning-guide.py`).
+     `recipes/rocksdb-tuning-guide.py`, which lists 16 pages with a numeric
+     filename prefix that sets the all-in-one reading order).
 
 2. **Write the cleanup script `recipes/{name}.py`**, either way:
    - run Stage 1: `.venv/bin/python prep.py sample.md --name my-doc --print`
@@ -170,7 +171,7 @@ Three documents have already gone through the loop — use them as templates:
 | `recipes/cpu-perf-tuning.py` | 340-page book (PDF) | split on `## ` and `### `; code-heavy book — `prompt_cpu-perf-tuning.txt` says "describe code in prose, no backticks/verbatim code" |
 | `recipes/cpu-perf-tuning-extract.py` | same book | whole-book `pymupdf4llm` → split on `#`; strips headers/page numbers/citation markers structurally |
 | `recipes/rocksdb.py` | 32-page ACM paper (PDF) | split on `## ` (no `###`); `rocksdb-extract.py` strips ACM running headers, `26:3` page:col markers, citation markers, REFERENCES |
-| `recipes/rocksdb-tuning-guide.py` | GitHub wiki page (single page) | fetch raw Markdown from the wiki endpoint (no HTML parsing); split on `#{2,4} `; `prompt_rocksdb-tuning-guide.txt` verbalizes config snippets as prose |
+| `recipes/rocksdb-tuning-guide.py` | GitHub wiki (16 pages, multi-page collection) | fetch raw Markdown from the wiki endpoint (no HTML parsing); numeric prefix sets reading order; split on `#{1,4} `; strips wiki links, images, bylines; `prompt_rocksdb-tuning-guide.txt` verbalizes code/config as prose |
 
 ---
 
@@ -199,8 +200,10 @@ Known blind spots, observed on real runs:
 - **URLs.** The model verbalizes URLs non-deterministically, so `clean_chunk`
   now applies a deterministic backstop — `verbalize_urls()` in `tts/llm.py`
   rewrites any literal `https://…` left in a response to "domain dot com slash
-  …" before the TTS sees it. Make sure it preserves the trailing sentence
-  punctuation (a URL at line-end must keep its closing period).
+  …" before the TTS sees it. It verbalizes URL punctuation (`.` `/` `-` `_` `#`
+  `?` `=` `&`) and drops a bare `https`/`http` scheme word the model sometimes
+  leaves behind. Make sure it preserves the trailing sentence punctuation (a URL
+  at line-end must keep its closing period).
 - **`md_residue` `#` false-positive on "C#".** The check matches any `#`, so
   the C# language (and F#) trips it. Not a real problem — ignore the flag.
 - **`word_ratio` on terse content.** Glossaries, reference tables, and

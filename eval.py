@@ -36,6 +36,14 @@ IGNORE_FILES = [
     "glossary",                         # cpu-perf-tuning: terse terms -> prose
     "list-of-the-major-cpu-microarchitectures",  # cpu-perf-tuning: reference table
     "references",                       # cpu-perf-tuning: bibliography
+    # rocksdb-tuning-guide: code- and table-heavy wiki pages expand tersely
+    # encoded content (code, table rows) into prose, so the word_ratio sits
+    # legitimately above the 0.85-1.20 band.
+    "memtable",
+    "prefix-seek",
+    "transactions",
+    "read-only-and-secondary-instances",
+    "memory-usage-in-rocksdb",
 ]
 
 

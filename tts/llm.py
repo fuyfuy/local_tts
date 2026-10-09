@@ -47,8 +47,9 @@ def verbalize_urls(text: str) -> str:
 
     The model verbalizes most URLs itself but is non-deterministic about it;
     some chunks keep the literal URL. This is a deterministic backstop that
-    turns ``https://example.com/a/b.html`` into "example dot com slash a slash
-    b dot html" so the TTS engine never has to read "h t t p colon slash slash".
+    turns ``https://example.com/a/b.html#x`` into "example dot com slash a slash
+    b dot html hash x" so the TTS engine never has to read "h t t p colon slash
+    slash" or trip on URL punctuation.
     """
     def to_speech(u: str) -> str:
         s = re.sub(r"^https?://", "", u)
@@ -62,9 +63,17 @@ def verbalize_urls(text: str) -> str:
         s = s.replace("/", " slash ")
         s = s.replace("-", " dash ")
         s = s.replace("_", " underscore ")
+        s = s.replace("#", " hash ")
+        s = s.replace("?", " question mark ")
+        s = s.replace("=", " equals ")
+        s = s.replace("&", " ampersand ")
         return re.sub(r"\s+", " ", s).strip() + tail
 
-    return _URL_RE.sub(lambda m: to_speech(m.group(0)), text)
+    text = _URL_RE.sub(lambda m: to_speech(m.group(0)), text)
+    # The model sometimes half-verbalizes a URL, leaving the bare scheme word
+    # ("https github dot com ..."). Drop it — the scheme is never spoken.
+    text = re.sub(r"\bhttps?\b", "", text, flags=re.IGNORECASE)
+    return re.sub(r"\s{2,}", " ", text).strip()
 
 
 _URL_RE = re.compile(r"https?://[^\s<>\"']+")
