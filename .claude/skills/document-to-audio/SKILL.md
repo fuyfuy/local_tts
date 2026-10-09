@@ -96,9 +96,9 @@ The LLM's *only* job is Stage 2 (clean). Stages 0, 2.5, and 3 are deterministic.
 ## 4. Running an existing document
 
 ```bash
-.venv/bin/python run.py inference-engineering                          # extract->clean->eval->synth->mp3
-.venv/bin/python run.py inference-engineering --format opus --bitrate 48k
-.venv/bin/python run.py inference-engineering --skip-extract --skip-clean   # synth + compress only
+.venv/bin/python run.py rocksdb-tuning-guide                          # download->clean->eval->synth->mp3
+.venv/bin/python run.py rocksdb-tuning-guide --format opus --bitrate 48k
+.venv/bin/python run.py rocksdb-tuning-guide --skip-extract --skip-clean   # synth + compress only
 ```
 
 Flags: `--skip-extract`, `--skip-clean`, `--skip-synth`, `--skip-eval`,
@@ -115,11 +115,16 @@ Single file (no corpus): `.venv/bin/python tts/say.py some.txt --voice af_nova -
 For each new document you produce a **bespoke cleanup script** and refine it
 until the eval gate passes. This loop is the heart of the pipeline.
 
+**Licensing first.** Only convert sources you have the right to make a derivative
+work from. Safe: Creative Commons (CC BY / CC BY-SA / CC0), Apache-2.0 project
+documentation, your own writing. Not OK without explicit permission:
+all-rights-reserved books/papers and anything marked "no portion may be
+reproduced". Two books were dropped from the repo for exactly this reason.
+
 1. **Get the source into `corpus/{name}/raw/`** as Markdown, one file per chapter/post.
    - PDF: write a `recipes/{name}-extract.py` using `pymupdf4llm` (see
-     `recipes/inference-engineering-extract.py`, or
-     `recipes/cpu-perf-tuning-extract.py`, which also strips running
-     headers/page numbers/`<sup>`/`<mark>`/`<u>` structurally).
+     `recipes/rocksdb-extract.py`, which strips running headers, page:column
+     markers, citation markers, and the REFERENCES bibliography structurally).
    - Extract the **whole book in one `pymupdf4llm` call**, then split chapters
      on the `#` headings. `pymupdf4llm` infers heading levels from font sizes,
      so per-page or per-chapter calls misclassify section headings (`##`) as `#`
@@ -161,15 +166,11 @@ until the eval gate passes. This loop is the heart of the pipeline.
 
 ## 6. Reference cleanup scripts
 
-Three documents have already gone through the loop — use them as templates:
+Several documents have already gone through the loop — use them as templates:
 
 | Script | Source | `split()` decision |
 |--------|--------|--------------------|
-| `recipes/inference-engineering.py` | 259-page book (PDF) | split on `## ` **and** `### ` (`#{2,3} `) so `5.1`, `5.1.3` each get a spoken heading |
-| `recipes/inference-engineering-extract.py` | same book | PDF → Markdown per chapter (`pymupdf4llm`) |
 | `recipes/cloudflare-ebpf.py` | blog series (HTML) | download + extract `<article>`, strip footer noise; split on `## ` and `### ` |
-| `recipes/cpu-perf-tuning.py` | 340-page book (PDF) | split on `## ` and `### `; code-heavy book — `prompt_cpu-perf-tuning.txt` says "describe code in prose, no backticks/verbatim code" |
-| `recipes/cpu-perf-tuning-extract.py` | same book | whole-book `pymupdf4llm` → split on `#`; strips headers/page numbers/citation markers structurally |
 | `recipes/rocksdb.py` | 32-page ACM paper (PDF) | split on `## ` (no `###`); `rocksdb-extract.py` strips ACM running headers, `26:3` page:col markers, citation markers, REFERENCES |
 | `recipes/rocksdb-tuning-guide.py` | GitHub wiki (16 pages, multi-page collection) | fetch raw Markdown from the wiki endpoint (no HTML parsing); numeric prefix sets reading order; split on `#{1,4} `; strips wiki links, images, bylines; `prompt_rocksdb-tuning-guide.txt` verbalizes code/config as prose |
 
@@ -250,14 +251,11 @@ Known blind spots, observed on real runs:
     Stage 2 (e.g. `Models **41**`, `4.4 NVIDIA Dynamo **111**`), the LLM will
     *narrate its own reasoning* about it ("the number forty-one ... should be
     omitted") instead of silently omitting it, and a footer carrying the *next*
-    section's title gets verbalized as a duplicate heading. `recipes/inference-engineering.py`
-    strips these with regexes in `strip_page_artifacts()` before the model sees
-    them, and drops the chapter preamble (`CHAPTER N` / `# Title` / `Title **NN**`)
-    when real `##` headings follow. **But the chapter number only lives in the
-    `CHAPTER N` line** — so capture it and bake it back into the chapter-title
-    heading (`## **Models**` → `## **Chapter 2: Models**`). Otherwise the model
-    loses the chapter number and latches onto "section 3.4" / "Figure 0.1" in the
-    body, dropping the opening sentences. Prefer this over a prompt instruction.
+    section's title gets verbalized as a duplicate heading. Strip these with
+    regexes before the model sees them. If a chapter number lives only in a
+    stripped `CHAPTER N` line, capture it and bake it back into the chapter-title
+    heading, or the model latches onto "section 3.4" / "Figure 0.1" in the body
+    and drops the opening sentences. Prefer this over a prompt instruction.
 11. **Bare headings and unnumbered headings make the model invent content.**
     A heading with no body text (e.g. `## Possibilities of Performance
     Bottlenecks.` immediately followed by `### System Metrics`) gets a whole

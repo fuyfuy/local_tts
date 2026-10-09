@@ -8,9 +8,9 @@ For each ``clean/*.txt`` it flags:
   * word-count drift vs the raw source (content lost or invented)
 
 Usage:
-    python eval.py                              # default corpus: inference-engineering
+    python eval.py                              # default corpus: rocksdb-tuning-guide
     python eval.py cloudflare-ebpf              # another corpus
-    python eval.py inference-engineering 06     # one chapter
+    python eval.py rocksdb-tuning-guide 03      # one file
     python eval.py --strict                     # exit non-zero if anything is flagged
 
 Exit code: 0 unless ``--strict`` and at least one check was flagged.
@@ -32,10 +32,6 @@ WORD_RATIO_MAX = 1.20
 # Files to skip entirely (substring match on filename). e.g. bibliographies /
 # "recommended reading" where URLs and loose formatting are legit content.
 IGNORE_FILES = [
-    "recommended-reading",              # inference-engineering bibliography
-    "glossary",                         # cpu-perf-tuning: terse terms -> prose
-    "list-of-the-major-cpu-microarchitectures",  # cpu-perf-tuning: reference table
-    "references",                       # cpu-perf-tuning: bibliography
     # rocksdb-tuning-guide: code- and table-heavy wiki pages expand tersely
     # encoded content (code, table rows) into prose, so the word_ratio sits
     # legitimately above the 0.85-1.20 band.
@@ -93,7 +89,7 @@ def fmt(value):
 
 def main():
     ap = argparse.ArgumentParser(description="QA-check cleaned narration vs raw source.")
-    ap.add_argument("corpus", nargs="?", default="inference-engineering")
+    ap.add_argument("corpus", nargs="?", default="rocksdb-tuning-guide")
     ap.add_argument("needle", nargs="?", default=None)
     ap.add_argument("--strict", action="store_true",
                     help="exit non-zero if anything is flagged")

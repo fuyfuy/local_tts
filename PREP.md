@@ -61,7 +61,7 @@ tts_local_workflow/
 
 Rules:
 
-- `{name}` is a short slug: `inference-engineering`, `cloudflare-ebpf`,
+- `{name}` is a short slug: `rocksdb-tuning-guide`, `cloudflare-ebpf`,
   `attention-is-all-you-need`.
 - `recipes/{name}.py` is **generated**, never hand-written from scratch. It
   imports the shared helpers from `tts/` and only encodes the decisions that
@@ -261,18 +261,10 @@ the cost of reading a few lines, not a full re-run.
 
 ## 9. Worked example (reference)
 
-Two documents have already gone through this pipeline; use them as reference
-implementations.
+A blog series has already gone through this pipeline; use it as a reference
+implementation.
 
-**A. Book — "Inference Engineering" (PDF).**
-- Stage 0: PDF → Markdown per chapter (`06_chapter-5-techniques.md`).
-- Structure: `##` sections with `###` sub-sections (`5.1`, `5.1.3`).
-- Decision: split on **`## ` and `### `** (`#{2,3} `), so sub-chapters get
-  their own spoken heading. Before this, sub-chapters were folded into one
-  paragraph and `5.1.3` lost its heading.
-- Noise: running headers (`CHAPTER 5`), page numbers (`Techniques **119**`).
-
-**B. Blog — Cloudflare eBPF replatforming (HTML, ebpf.io).**
+**Blog — Cloudflare eBPF replatforming (HTML, ebpf.io).**
 - Stage 0: fetch HTML → extract `<article>` → Markdown, stripping footer
   headings ("Share on social media", "Subscribe to eCHO News") and the date.
 - Structure: `#` title + `##` sections + `###` subsections (part 3 only).
@@ -280,5 +272,5 @@ implementations.
   extraction time.
 - Same default prompt reused unchanged (the default prompt is generic enough).
 
-Both hit the same class of bug — an empty/truncated section from the thinking
-model — which is why rules #1–#3 in Section 5 exist.
+Like the other documents, this hit an empty/truncated-section bug from the
+thinking model — which is why rules #1–#3 in Section 5 exist.

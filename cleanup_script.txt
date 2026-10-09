@@ -165,7 +165,7 @@
  - md_residue — the model left Markdown in ("#", bold, code fences, table pipes, URLs). Should be zero.                                                                                       
  - orphan_numbers — a page number survived as a bare line. Should be zero.                                                                                                                    
  - dangling_lines — sentences cut off / headings not punctuated. Near zero (blank lines and a few section transitions are fine).                                                              
- - repeated_lines — a running header ("Inference Engineering") still repeating. Should be zero.                                                                                               
+ - repeated_lines — a running header (the book/section title) still repeating. Should be zero.                                                                                               
  - length_ratio — the big one. If a cleaned chapter is < 50% of the source, the model **dropped content**; if > 130%, it's hallucinating or being verbose. Typical healthy range for this     
  task is 0.7–1.0.                                                                                                                                                                             
                                                                                                                                                                                               

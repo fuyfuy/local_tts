@@ -3,10 +3,10 @@
 Chains: extract (if the corpus has an extractor) -> clean -> synthesize -> compress.
 
 Usage (from the repo root):
-    python run.py inference-engineering                       # full run, mp3 64k
-    python run.py inference-engineering --format opus --bitrate 48k
-    python run.py inference-engineering --skip-extract        # raw/ already exists
-    python run.py cloudflare-ebpf                             # download + clean + synth + compress
+    python run.py rocksdb-tuning-guide                       # download + clean + synth + compress
+    python run.py rocksdb-tuning-guide --format opus --bitrate 48k
+    python run.py rocksdb-tuning-guide --skip-extract --skip-clean   # synth + compress only
+    python run.py rocksdb                                     # extract -> clean -> synth + compress
 
 Every stage is idempotent, so re-running skips work that's already done.
 """
@@ -27,7 +27,7 @@ def run(cmd):
 
 def main():
     ap = argparse.ArgumentParser(description="Run the full document-to-audio pipeline.")
-    ap.add_argument("name", help="corpus slug, e.g. inference-engineering")
+    ap.add_argument("name", help="corpus slug, e.g. rocksdb-tuning-guide")
     ap.add_argument("--skip-extract", action="store_true")
     ap.add_argument("--skip-clean", action="store_true")
     ap.add_argument("--skip-synth", action="store_true")
